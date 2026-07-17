@@ -149,7 +149,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private TextView notificationOverlayView;
     private int requestedNotificationOverlayVisibility = View.GONE;
     private TextView performanceOverlayView;
-    private KspKeyboardView kspKeyboardView;
+    private final java.util.List<KspKeyboardView> kspKeyboardPanels = new java.util.ArrayList<>();
 
     private MediaCodecDecoderRenderer decoderRenderer;
     private boolean reportedCrash;
@@ -253,34 +253,24 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         backgroundTouchView.setOnTouchListener(this);
 
         if (prefConfig.kspKeyboard) {
-            // Dock the video at the top of the screen and fill the space
-            // below it with the KSP keyboard
-            FrameLayout contentFrame = (FrameLayout) streamView.getParent();
-
-            FrameLayout.LayoutParams svParams = (FrameLayout.LayoutParams) streamView.getLayoutParams();
-            svParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-            streamView.setLayoutParams(svParams);
-
-            kspKeyboardView = new KspKeyboardView(this);
-            kspKeyboardView.setVideoAspectRatio((double) prefConfig.width / prefConfig.height);
-            contentFrame.addView(kspKeyboardView, new FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT, Gravity.BOTTOM));
-
-            kspKeyboardView.setListener(new KspKeyboardView.Listener() {
+            // (Re)apply the keyboard layout whenever the content frame changes
+            // size: initial layout and orientation changes. The relayout is
+            // posted so it runs outside of the in-progress layout pass.
+            final View contentFrame = (View) streamView.getParent();
+            contentFrame.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
                 @Override
-                public void onKey(boolean down, int androidKeyCode) {
-                    if (connected) {
-                        keyboardEvent(down, (short) androidKeyCode);
+                public void onLayoutChange(View v, int left, int top, int right, int bottom,
+                                           int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                    if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) {
+                        contentFrame.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                applyKspKeyboardLayout();
+                            }
+                        });
                     }
                 }
-
-                @Override
-                public void onToggleIme() {
-                    toggleKeyboard();
-                }
             });
-
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -570,10 +560,89 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         streamView.getHolder().addCallback(this);
     }
 
+    // Lays out the stream view and KSP keyboard panels for the current
+    // content frame size. Portrait: video on top, one keyboard panel below.
+    // Landscape: video top-center, flight controls left, toggles right,
+    // action groups in a strip along the bottom.
+    private void applyKspKeyboardLayout() {
+        FrameLayout contentFrame = (FrameLayout) streamView.getParent();
+        int frameWidth = contentFrame.getWidth();
+        int frameHeight = contentFrame.getHeight();
+        if (frameWidth == 0 || frameHeight == 0) {
+            return;
+        }
+
+        for (KspKeyboardView panel : kspKeyboardPanels) {
+            contentFrame.removeView(panel);
+        }
+        kspKeyboardPanels.clear();
+
+        double aspect = (double) prefConfig.width / prefConfig.height;
+        FrameLayout.LayoutParams svParams = (FrameLayout.LayoutParams) streamView.getLayoutParams();
+        svParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+
+        if (frameWidth > frameHeight) {
+            // Shrink the video slightly to make room for a bottom strip, which
+            // also widens the side panels beyond the bare 19.5:9 leftover
+            int stripHeight = Math.round(frameHeight * 0.12f);
+            int videoHeight = frameHeight - stripHeight;
+            int videoWidth = (int) Math.round(videoHeight * aspect);
+            if (videoWidth > frameWidth) {
+                videoWidth = frameWidth;
+                videoHeight = (int) Math.round(frameWidth / aspect);
+            }
+            int sideWidth = Math.max((frameWidth - videoWidth) / 2, 0);
+
+            svParams.width = videoWidth;
+            svParams.height = videoHeight;
+
+            if (sideWidth > 0) {
+                addKspPanel(KspKeyboardView.createLandscapeLeft(this),
+                        sideWidth, videoHeight, Gravity.TOP | Gravity.LEFT);
+                addKspPanel(KspKeyboardView.createLandscapeRight(this),
+                        sideWidth, videoHeight, Gravity.TOP | Gravity.RIGHT);
+            }
+            addKspPanel(KspKeyboardView.createLandscapeBottom(this),
+                    FrameLayout.LayoutParams.MATCH_PARENT, stripHeight, Gravity.BOTTOM);
+        }
+        else {
+            int videoHeight = (int) Math.round(frameWidth / aspect);
+            svParams.width = FrameLayout.LayoutParams.MATCH_PARENT;
+            svParams.height = videoHeight;
+
+            addKspPanel(KspKeyboardView.createPortrait(this),
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    Math.max(frameHeight - videoHeight, 0), Gravity.BOTTOM);
+        }
+
+        streamView.setLayoutParams(svParams);
+    }
+
+    private void addKspPanel(KspKeyboardView panel, int width, int height, int gravity) {
+        panel.setListener(new KspKeyboardView.Listener() {
+            @Override
+            public void onKey(boolean down, int androidKeyCode) {
+                if (connected) {
+                    keyboardEvent(down, (short) androidKeyCode);
+                }
+            }
+
+            @Override
+            public void onToggleIme() {
+                toggleKeyboard();
+            }
+        });
+
+        FrameLayout contentFrame = (FrameLayout) streamView.getParent();
+        contentFrame.addView(panel, new FrameLayout.LayoutParams(width, height, gravity));
+        kspKeyboardPanels.add(panel);
+    }
+
     private void setPreferredOrientationForCurrentDisplay() {
-        // KSP keyboard mode docks a keyboard below the video, so we want portrait
+        // KSP keyboard mode lays out a keyboard around the video in both
+        // portrait and landscape, so let the sensor decide
         if (prefConfig.kspKeyboard) {
-            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
             return;
         }
 

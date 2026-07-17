@@ -16,10 +16,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A fixed on-screen keyboard tailored for Kerbal Space Program, meant to be
- * docked below the stream view in portrait mode. Keys act like a physical
- * keyboard: key-down on touch, key-up on release, with full multi-touch
- * support so chords like Shift+W (throttle up while pitching) work.
+ * A fixed on-screen keyboard panel tailored for Kerbal Space Program. Keys act
+ * like a physical keyboard: key-down on touch, key-up on release, with full
+ * multi-touch support so chords like Shift+W (throttle up while pitching) work.
+ *
+ * In portrait, a single panel docks below the video. In landscape, three
+ * panels surround it: flight controls left, toggles/staging right, and a
+ * strip with action groups along the bottom.
  */
 public class KspKeyboardView extends View {
     // Pseudo keycode for the key that toggles the local IME for free text entry
@@ -63,7 +66,6 @@ public class KspKeyboardView extends View {
     private final Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint subLabelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-    private double videoAspectRatio = 16.0 / 9.0;
     private Listener listener;
 
     public KspKeyboardView(Context context) {
@@ -83,11 +85,92 @@ public class KspKeyboardView extends View {
         labelPaint.setTextAlign(Paint.Align.CENTER);
         subLabelPaint.setColor(0xFF9E9EAE);
         subLabelPaint.setTextAlign(Paint.Align.CENTER);
-
-        buildLayout();
     }
 
-    private void buildLayout() {
+    public static KspKeyboardView createPortrait(Context context) {
+        KspKeyboardView v = new KspKeyboardView(context);
+        v.buildPortraitLayout();
+        return v;
+    }
+
+    public static KspKeyboardView createLandscapeLeft(Context context) {
+        KspKeyboardView v = new KspKeyboardView(context);
+        v.addRow(
+                new Key("Q", "Roll↶", KeyEvent.KEYCODE_Q, 1, STYLE_ACCENT),
+                new Key("W", "Pitch↓", KeyEvent.KEYCODE_W, 1, STYLE_ACCENT),
+                new Key("E", "Roll↷", KeyEvent.KEYCODE_E, 1, STYLE_ACCENT)
+        );
+        v.addRow(
+                new Key("A", "Yaw←", KeyEvent.KEYCODE_A, 1, STYLE_ACCENT),
+                new Key("S", "Pitch↑", KeyEvent.KEYCODE_S, 1, STYLE_ACCENT),
+                new Key("D", "Yaw→", KeyEvent.KEYCODE_D, 1, STYLE_ACCENT)
+        );
+        v.addRow(
+                new Key("THR ▲", "Shift", KeyEvent.KEYCODE_SHIFT_LEFT, 1, STYLE_THROTTLE)
+        );
+        v.addRow(
+                new Key("THR ▼", "Ctrl", KeyEvent.KEYCODE_CTRL_LEFT, 1, STYLE_THROTTLE)
+        );
+        v.addRow(
+                new Key("Z", "Full", KeyEvent.KEYCODE_Z, 1, STYLE_THROTTLE),
+                new Key("X", "Cut", KeyEvent.KEYCODE_X, 1, STYLE_THROTTLE),
+                new Key("FINE", "Caps", KeyEvent.KEYCODE_CAPS_LOCK, 1, STYLE_NORMAL)
+        );
+        return v;
+    }
+
+    public static KspKeyboardView createLandscapeRight(Context context) {
+        KspKeyboardView v = new KspKeyboardView(context);
+        v.addRow(
+                new Key("T", "SAS", KeyEvent.KEYCODE_T, 1, STYLE_NORMAL),
+                new Key("R", "RCS", KeyEvent.KEYCODE_R, 1, STYLE_NORMAL),
+                new Key("G", "Gear", KeyEvent.KEYCODE_G, 1, STYLE_NORMAL)
+        );
+        v.addRow(
+                new Key("B", "Brake", KeyEvent.KEYCODE_B, 1, STYLE_NORMAL),
+                new Key("U", "Light", KeyEvent.KEYCODE_U, 1, STYLE_NORMAL),
+                new Key("M", "Map", KeyEvent.KEYCODE_M, 1, STYLE_NORMAL)
+        );
+        v.addRow(
+                new Key("◀", "Warp−", KeyEvent.KEYCODE_COMMA, 1, STYLE_NORMAL),
+                new Key("▶", "Warp+", KeyEvent.KEYCODE_PERIOD, 1, STYLE_NORMAL),
+                new Key("×1", "Warp", KeyEvent.KEYCODE_SLASH, 1, STYLE_NORMAL)
+        );
+        v.addRow(
+                new Key("STAGE", "Space", KeyEvent.KEYCODE_SPACE, 1, STYLE_STAGE)
+        );
+        v.addRow(
+                new Key("ESC", "Pause", KeyEvent.KEYCODE_ESCAPE, 1, STYLE_NORMAL),
+                new Key("⌨", "Text", KEY_TOGGLE_IME, 1, STYLE_NORMAL),
+                new Key("ABORT", "Bksp", KeyEvent.KEYCODE_DEL, 1, STYLE_DANGER)
+        );
+        return v;
+    }
+
+    public static KspKeyboardView createLandscapeBottom(Context context) {
+        KspKeyboardView v = new KspKeyboardView(context);
+        v.addRow(
+                new Key("1", null, KeyEvent.KEYCODE_1, 1, STYLE_NORMAL),
+                new Key("2", null, KeyEvent.KEYCODE_2, 1, STYLE_NORMAL),
+                new Key("3", null, KeyEvent.KEYCODE_3, 1, STYLE_NORMAL),
+                new Key("4", null, KeyEvent.KEYCODE_4, 1, STYLE_NORMAL),
+                new Key("5", null, KeyEvent.KEYCODE_5, 1, STYLE_NORMAL),
+                new Key("6", null, KeyEvent.KEYCODE_6, 1, STYLE_NORMAL),
+                new Key("7", null, KeyEvent.KEYCODE_7, 1, STYLE_NORMAL),
+                new Key("8", null, KeyEvent.KEYCODE_8, 1, STYLE_NORMAL),
+                new Key("9", null, KeyEvent.KEYCODE_9, 1, STYLE_NORMAL),
+                new Key("0", null, KeyEvent.KEYCODE_0, 1, STYLE_NORMAL),
+                new Key("F5", "QSave", KeyEvent.KEYCODE_F5, 1, STYLE_NORMAL),
+                new Key("F9", "QLoad", KeyEvent.KEYCODE_F9, 1, STYLE_NORMAL),
+                new Key("F", "Free", KeyEvent.KEYCODE_F, 1, STYLE_NORMAL),
+                new Key("V", "Cam", KeyEvent.KEYCODE_V, 1, STYLE_NORMAL),
+                new Key("C", "IVA", KeyEvent.KEYCODE_C, 1, STYLE_NORMAL),
+                new Key("[ ]", "Vessel", KeyEvent.KEYCODE_RIGHT_BRACKET, 1, STYLE_NORMAL)
+        );
+        return v;
+    }
+
+    private void buildPortraitLayout() {
         rows.clear();
         allKeys.clear();
 
@@ -162,23 +245,6 @@ public class KspKeyboardView extends View {
 
     public void setListener(Listener listener) {
         this.listener = listener;
-    }
-
-    public void setVideoAspectRatio(double aspectRatio) {
-        if (aspectRatio > 0) {
-            this.videoAspectRatio = aspectRatio;
-            requestLayout();
-        }
-    }
-
-    @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        // Claim the space left over below the video, which is pinned to the
-        // top of the parent and letterboxed to the stream's aspect ratio
-        int width = MeasureSpec.getSize(widthMeasureSpec);
-        int parentHeight = MeasureSpec.getSize(heightMeasureSpec);
-        int videoHeight = (int) Math.round(width / videoAspectRatio);
-        setMeasuredDimension(width, Math.max(parentHeight - videoHeight, 0));
     }
 
     @Override
