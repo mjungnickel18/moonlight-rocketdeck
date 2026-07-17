@@ -226,17 +226,30 @@ public class KspKeyboardView extends View {
             canvas.drawRoundRect(k.rect, radius, radius, keyPaint);
 
             float centerX = k.rect.centerX();
+            float maxTextWidth = k.rect.width() * 0.92f;
             if (k.subLabel != null) {
                 float labelBaseline = k.rect.centerY() + labelPaint.getTextSize() * 0.1f;
-                canvas.drawText(k.label, centerX, labelBaseline, labelPaint);
-                canvas.drawText(k.subLabel, centerX,
-                        labelBaseline + subLabelPaint.getTextSize() * 1.4f, subLabelPaint);
+                drawFittedText(canvas, k.label, centerX, labelBaseline, labelPaint, maxTextWidth);
+                drawFittedText(canvas, k.subLabel, centerX,
+                        labelBaseline + subLabelPaint.getTextSize() * 1.4f, subLabelPaint, maxTextWidth);
             }
             else {
-                canvas.drawText(k.label, centerX,
-                        k.rect.centerY() + labelPaint.getTextSize() * 0.35f, labelPaint);
+                drawFittedText(canvas, k.label, centerX,
+                        k.rect.centerY() + labelPaint.getTextSize() * 0.35f, labelPaint, maxTextWidth);
             }
         }
+    }
+
+    // Draws text centered at x, shrinking it if it would overflow maxWidth
+    private void drawFittedText(Canvas canvas, String text, float x, float baseline,
+                                Paint paint, float maxWidth) {
+        float originalSize = paint.getTextSize();
+        float measured = paint.measureText(text);
+        if (measured > maxWidth) {
+            paint.setTextSize(originalSize * maxWidth / measured);
+        }
+        canvas.drawText(text, x, baseline, paint);
+        paint.setTextSize(originalSize);
     }
 
     private int getKeyColor(Key k) {
