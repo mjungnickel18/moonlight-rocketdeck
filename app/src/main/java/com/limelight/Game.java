@@ -30,7 +30,10 @@ import com.limelight.nvstream.jni.MoonBridge;
 import com.limelight.preferences.GlPreferences;
 import com.limelight.preferences.PreferenceConfiguration;
 import com.limelight.ui.GameGestures;
+import com.limelight.ui.KspKeyboardView;
 import com.limelight.ui.StreamView;
+
+import android.view.Gravity;
 import com.limelight.utils.Dialog;
 import com.limelight.utils.ServerHelper;
 import com.limelight.utils.ShortcutHelper;
@@ -146,6 +149,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private TextView notificationOverlayView;
     private int requestedNotificationOverlayVisibility = View.GONE;
     private TextView performanceOverlayView;
+    private KspKeyboardView kspKeyboardView;
 
     private MediaCodecDecoderRenderer decoderRenderer;
     private boolean reportedCrash;
@@ -247,6 +251,51 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         // allows proper touch splitting, which the OSC relies upon.
         View backgroundTouchView = findViewById(R.id.backgroundTouchView);
         backgroundTouchView.setOnTouchListener(this);
+
+        if (prefConfig.kspKeyboard) {
+            // Dock the video at the top of the screen and fill the space
+            // below it with the KSP keyboard
+            FrameLayout contentFrame = (FrameLayout) streamView.getParent();
+
+            FrameLayout.LayoutParams svParams = (FrameLayout.LayoutParams) streamView.getLayoutParams();
+            svParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+            streamView.setLayoutParams(svParams);
+
+            kspKeyboardView = new KspKeyboardView(this);
+            contentFrame.addView(kspKeyboardView, new FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT, 0, Gravity.BOTTOM));
+
+            kspKeyboardView.setListener(new KspKeyboardView.Listener() {
+                @Override
+                public void onKey(boolean down, int androidKeyCode) {
+                    if (connected) {
+                        keyboardEvent(down, (short) androidKeyCode);
+                    }
+                }
+
+                @Override
+                public void onToggleIme() {
+                    toggleKeyboard();
+                }
+            });
+
+            // Resize the keyboard whenever the video layout changes so it
+            // always fills the area between the video and the screen bottom
+            streamView.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+                @Override
+                public void onLayoutChange(View v, int left, int top, int right, int bottom,
+                                           int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                    View parent = (View) v.getParent();
+                    int kbHeight = parent.getHeight() - bottom;
+                    if (kbHeight > 0 && kspKeyboardView.getLayoutParams().height != kbHeight) {
+                        FrameLayout.LayoutParams kbParams =
+                                (FrameLayout.LayoutParams) kspKeyboardView.getLayoutParams();
+                        kbParams.height = kbHeight;
+                        kspKeyboardView.setLayoutParams(kbParams);
+                    }
+                }
+            });
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             // Request unbuffered input event dispatching for all input classes we handle here.
@@ -536,6 +585,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     }
 
     private void setPreferredOrientationForCurrentDisplay() {
+        // KSP keyboard mode docks a keyboard below the video, so we want portrait
+        if (prefConfig.kspKeyboard) {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
+            return;
+        }
+
         Display display = getWindowManager().getDefaultDisplay();
 
         // For semi-square displays, we use more complex logic to determine which orientation to use (if any)
@@ -943,7 +998,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
         }
 
-        if (prefConfig.stretchVideo || aspectRatioMatch) {
+        if ((prefConfig.stretchVideo || aspectRatioMatch) && !prefConfig.kspKeyboard) {
             // Set the surface to the size of the video
             streamView.getHolder().setFixedSize(prefConfig.width, prefConfig.height);
         }
