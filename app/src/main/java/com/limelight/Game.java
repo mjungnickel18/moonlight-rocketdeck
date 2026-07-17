@@ -262,8 +262,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             streamView.setLayoutParams(svParams);
 
             kspKeyboardView = new KspKeyboardView(this);
+            kspKeyboardView.setVideoAspectRatio((double) prefConfig.width / prefConfig.height);
             contentFrame.addView(kspKeyboardView, new FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT, 0, Gravity.BOTTOM));
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT, Gravity.BOTTOM));
 
             kspKeyboardView.setListener(new KspKeyboardView.Listener() {
                 @Override
@@ -279,22 +281,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 }
             });
 
-            // Resize the keyboard whenever the video layout changes so it
-            // always fills the area between the video and the screen bottom
-            streamView.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
-                @Override
-                public void onLayoutChange(View v, int left, int top, int right, int bottom,
-                                           int oldLeft, int oldTop, int oldRight, int oldBottom) {
-                    View parent = (View) v.getParent();
-                    int kbHeight = parent.getHeight() - bottom;
-                    if (kbHeight > 0 && kspKeyboardView.getLayoutParams().height != kbHeight) {
-                        FrameLayout.LayoutParams kbParams =
-                                (FrameLayout.LayoutParams) kspKeyboardView.getLayoutParams();
-                        kbParams.height = kbHeight;
-                        kspKeyboardView.setLayoutParams(kbParams);
-                    }
-                }
-            });
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

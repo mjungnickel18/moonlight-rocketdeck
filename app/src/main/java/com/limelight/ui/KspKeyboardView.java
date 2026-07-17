@@ -63,6 +63,7 @@ public class KspKeyboardView extends View {
     private final Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint subLabelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
+    private double videoAspectRatio = 16.0 / 9.0;
     private Listener listener;
 
     public KspKeyboardView(Context context) {
@@ -161,6 +162,23 @@ public class KspKeyboardView extends View {
 
     public void setListener(Listener listener) {
         this.listener = listener;
+    }
+
+    public void setVideoAspectRatio(double aspectRatio) {
+        if (aspectRatio > 0) {
+            this.videoAspectRatio = aspectRatio;
+            requestLayout();
+        }
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        // Claim the space left over below the video, which is pinned to the
+        // top of the parent and letterboxed to the stream's aspect ratio
+        int width = MeasureSpec.getSize(widthMeasureSpec);
+        int parentHeight = MeasureSpec.getSize(heightMeasureSpec);
+        int videoHeight = (int) Math.round(width / videoAspectRatio);
+        setMeasuredDimension(width, Math.max(parentHeight - videoHeight, 0));
     }
 
     @Override
