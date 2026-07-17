@@ -631,6 +631,26 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             public void onToggleIme() {
                 toggleKeyboard();
             }
+
+            @Override
+            public void onMouseButton(boolean down, boolean rightButton) {
+                if (connected) {
+                    byte button = rightButton ? MouseButtonPacket.BUTTON_RIGHT : MouseButtonPacket.BUTTON_LEFT;
+                    if (down) {
+                        conn.sendMouseButtonDown(button);
+                    }
+                    else {
+                        conn.sendMouseButtonUp(button);
+                    }
+                }
+            }
+
+            @Override
+            public void onMouseScroll(int direction) {
+                if (connected) {
+                    conn.sendMouseScroll((byte) direction);
+                }
+            }
         });
 
         FrameLayout contentFrame = (FrameLayout) streamView.getParent();

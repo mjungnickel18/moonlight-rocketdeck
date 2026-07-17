@@ -25,8 +25,15 @@ import java.util.List;
  * strip with action groups along the bottom.
  */
 public class KspKeyboardView extends View {
-    // Pseudo keycode for the key that toggles the local IME for free text entry
+    // Pseudo keycodes for keys that don't send keyboard input
     private static final int KEY_TOGGLE_IME = -1;
+    private static final int KEY_MOUSE_LEFT = -2;
+    private static final int KEY_MOUSE_RIGHT = -3;
+    private static final int KEY_WHEEL_UP = -4;
+    private static final int KEY_WHEEL_DOWN = -5;
+
+    // Auto-repeat cadence for the held mouse wheel keys
+    private static final long WHEEL_REPEAT_MS = 150;
 
     private static final int STYLE_NORMAL = 0;
     private static final int STYLE_ACCENT = 1;   // flight controls
@@ -37,6 +44,8 @@ public class KspKeyboardView extends View {
     public interface Listener {
         void onKey(boolean down, int androidKeyCode);
         void onToggleIme();
+        void onMouseButton(boolean down, boolean rightButton);
+        void onMouseScroll(int direction);
     }
 
     private static class Key {
@@ -116,6 +125,10 @@ public class KspKeyboardView extends View {
                 new Key("X", "Cut", KeyEvent.KEYCODE_X, 1, STYLE_THROTTLE),
                 new Key("FINE", "Caps", KeyEvent.KEYCODE_CAPS_LOCK, 1, STYLE_NORMAL)
         );
+        v.addRow(
+                new Key("LMB", "Click", KEY_MOUSE_LEFT, 2, STYLE_ACCENT),
+                new Key("⇡", "Wheel", KEY_WHEEL_UP, 1, STYLE_ACCENT)
+        );
         return v;
     }
 
@@ -143,6 +156,10 @@ public class KspKeyboardView extends View {
                 new Key("ESC", "Pause", KeyEvent.KEYCODE_ESCAPE, 1, STYLE_NORMAL),
                 new Key("⌨", "Text", KEY_TOGGLE_IME, 1, STYLE_NORMAL),
                 new Key("ABORT", "Bksp", KeyEvent.KEYCODE_DEL, 1, STYLE_DANGER)
+        );
+        v.addRow(
+                new Key("⇣", "Wheel", KEY_WHEEL_DOWN, 1, STYLE_ACCENT),
+                new Key("RMB", "Click", KEY_MOUSE_RIGHT, 2, STYLE_ACCENT)
         );
         return v;
     }
@@ -231,6 +248,12 @@ public class KspKeyboardView extends View {
                 new Key("STAGE", "Space", KeyEvent.KEYCODE_SPACE, 3, STYLE_STAGE),
                 new Key("FINE", "Caps", KeyEvent.KEYCODE_CAPS_LOCK, 1, STYLE_NORMAL),
                 new Key("[ ]", "Vessel", KeyEvent.KEYCODE_RIGHT_BRACKET, 1, STYLE_NORMAL)
+        );
+        addRow(
+                new Key("LMB", "Click", KEY_MOUSE_LEFT, 2, STYLE_ACCENT),
+                new Key("⇡", "Wheel", KEY_WHEEL_UP, 1, STYLE_ACCENT),
+                new Key("⇣", "Wheel", KEY_WHEEL_DOWN, 1, STYLE_ACCENT),
+                new Key("RMB", "Click", KEY_MOUSE_RIGHT, 2, STYLE_ACCENT)
         );
     }
 
@@ -407,18 +430,41 @@ public class KspKeyboardView extends View {
         invalidate();
     }
 
-    private void dispatchKey(Key k, boolean down) {
+    private void dispatchKey(final Key k, boolean down) {
         if (listener == null) {
             return;
         }
-        if (k.keyCode == KEY_TOGGLE_IME) {
-            // Only fire on release so the IME doesn't swallow our up event
-            if (!down) {
-                listener.onToggleIme();
-            }
-        }
-        else {
-            listener.onKey(down, k.keyCode);
+        switch (k.keyCode) {
+            case KEY_TOGGLE_IME:
+                // Only fire on release so the IME doesn't swallow our up event
+                if (!down) {
+                    listener.onToggleIme();
+                }
+                break;
+            case KEY_MOUSE_LEFT:
+            case KEY_MOUSE_RIGHT:
+                listener.onMouseButton(down, k.keyCode == KEY_MOUSE_RIGHT);
+                break;
+            case KEY_WHEEL_UP:
+            case KEY_WHEEL_DOWN:
+                final int direction = (k.keyCode == KEY_WHEEL_UP) ? 1 : -1;
+                if (down) {
+                    listener.onMouseScroll(direction);
+                    // Auto-repeat while the key stays held
+                    postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (k.pressCount > 0 && listener != null) {
+                                listener.onMouseScroll(direction);
+                                postDelayed(this, WHEEL_REPEAT_MS);
+                            }
+                        }
+                    }, WHEEL_REPEAT_MS * 2);
+                }
+                break;
+            default:
+                listener.onKey(down, k.keyCode);
+                break;
         }
     }
 }
