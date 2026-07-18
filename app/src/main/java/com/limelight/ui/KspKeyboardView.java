@@ -187,6 +187,22 @@ public class KspKeyboardView extends View {
         return v;
     }
 
+    // Two-row bottom strip for screens whose aspect ratio leaves a tall
+    // leftover below the video (e.g. 16:10 tablets): adds the RCS docking
+    // translation cluster
+    public static KspKeyboardView createLandscapeBottomTall(Context context) {
+        KspKeyboardView v = createLandscapeBottom(context);
+        v.addRow(
+                new Key("H", "Tr Fwd", KeyEvent.KEYCODE_H, 1, STYLE_NORMAL),
+                new Key("N", "Tr Back", KeyEvent.KEYCODE_N, 1, STYLE_NORMAL),
+                new Key("J", "Tr←", KeyEvent.KEYCODE_J, 1, STYLE_NORMAL),
+                new Key("L", "Tr→", KeyEvent.KEYCODE_L, 1, STYLE_NORMAL),
+                new Key("I", "Tr↓", KeyEvent.KEYCODE_I, 1, STYLE_NORMAL),
+                new Key("K", "Tr↑", KeyEvent.KEYCODE_K, 1, STYLE_NORMAL)
+        );
+        return v;
+    }
+
     private void buildPortraitLayout() {
         rows.clear();
         allKeys.clear();

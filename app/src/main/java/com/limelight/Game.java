@@ -583,26 +583,36 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         if (frameWidth > frameHeight) {
             // Shrink the video slightly to make room for a bottom strip, which
-            // also widens the side panels beyond the bare 19.5:9 leftover
+            // also widens the side panels beyond the bare leftover
             int stripHeight = Math.round(frameHeight * 0.12f);
             int videoHeight = frameHeight - stripHeight;
             int videoWidth = (int) Math.round(videoHeight * aspect);
-            if (videoWidth > frameWidth) {
-                videoWidth = frameWidth;
-                videoHeight = (int) Math.round(frameWidth / aspect);
+            int sideWidth = (frameWidth - videoWidth) / 2;
+
+            // On screens close to the stream's aspect ratio (e.g. 16:10
+            // tablets) the leftover beside the video is too narrow to be
+            // usable. Guarantee a minimum side panel width and grow the
+            // bottom strip with the space this frees up instead.
+            int minSideWidth = Math.round(110 * getResources().getDisplayMetrics().density);
+            if (sideWidth < minSideWidth) {
+                sideWidth = minSideWidth;
+                videoWidth = Math.max(frameWidth - 2 * minSideWidth, 1);
+                videoHeight = (int) Math.round(videoWidth / aspect);
+                stripHeight = frameHeight - videoHeight;
             }
-            int sideWidth = Math.max((frameWidth - videoWidth) / 2, 0);
 
             svParams.width = videoWidth;
             svParams.height = videoHeight;
 
-            if (sideWidth > 0) {
-                addKspPanel(KspKeyboardView.createLandscapeLeft(this),
-                        sideWidth, videoHeight, Gravity.TOP | Gravity.LEFT);
-                addKspPanel(KspKeyboardView.createLandscapeRight(this),
-                        sideWidth, videoHeight, Gravity.TOP | Gravity.RIGHT);
-            }
-            addKspPanel(KspKeyboardView.createLandscapeBottom(this),
+            addKspPanel(KspKeyboardView.createLandscapeLeft(this),
+                    sideWidth, videoHeight, Gravity.TOP | Gravity.LEFT);
+            addKspPanel(KspKeyboardView.createLandscapeRight(this),
+                    sideWidth, videoHeight, Gravity.TOP | Gravity.RIGHT);
+
+            // A tall strip (tablets) fits a second row with the docking keys
+            boolean tallStrip = stripHeight > frameHeight * 0.2f;
+            addKspPanel(tallStrip ? KspKeyboardView.createLandscapeBottomTall(this)
+                            : KspKeyboardView.createLandscapeBottom(this),
                     FrameLayout.LayoutParams.MATCH_PARENT, stripHeight, Gravity.BOTTOM);
         }
         else {
