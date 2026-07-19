@@ -150,6 +150,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private int requestedNotificationOverlayVisibility = View.GONE;
     private TextView performanceOverlayView;
     private final java.util.List<KspKeyboardView> kspKeyboardPanels = new java.util.ArrayList<>();
+    private boolean kspFullscreen;
+    private TextView kspFullscreenButton;
 
     private MediaCodecDecoderRenderer decoderRenderer;
     private boolean reportedCrash;
@@ -577,9 +579,31 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         }
         kspKeyboardPanels.clear();
 
+        if (kspFullscreenButton != null) {
+            contentFrame.removeView(kspFullscreenButton);
+        }
+
         double aspect = (double) prefConfig.width / prefConfig.height;
         FrameLayout.LayoutParams svParams = (FrameLayout.LayoutParams) streamView.getLayoutParams();
         svParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+
+        if (frameWidth > frameHeight && kspFullscreen) {
+            // Fullscreen video: no keyboard, video as large as the screen
+            // allows, with a floating button in the corner to come back
+            int videoHeight = frameHeight;
+            int videoWidth = (int) Math.round(videoHeight * aspect);
+            if (videoWidth > frameWidth) {
+                videoWidth = frameWidth;
+                videoHeight = (int) Math.round(frameWidth / aspect);
+            }
+            svParams.width = videoWidth;
+            svParams.height = videoHeight;
+            svParams.gravity = Gravity.CENTER;
+            streamView.setLayoutParams(svParams);
+
+            addKspFullscreenButton(contentFrame);
+            return;
+        }
 
         if (frameWidth > frameHeight) {
             // Shrink the video slightly to make room for a bottom strip, which
@@ -628,6 +652,36 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         streamView.setLayoutParams(svParams);
     }
 
+    private void addKspFullscreenButton(FrameLayout contentFrame) {
+        float density = getResources().getDisplayMetrics().density;
+        if (kspFullscreenButton == null) {
+            kspFullscreenButton = new TextView(this);
+            kspFullscreenButton.setText("⛶");
+            kspFullscreenButton.setTextColor(0xFFFFFFFF);
+            kspFullscreenButton.setTextSize(22);
+            kspFullscreenButton.setGravity(Gravity.CENTER);
+            android.graphics.drawable.GradientDrawable background =
+                    new android.graphics.drawable.GradientDrawable();
+            background.setColor(0x882A2A36);
+            background.setCornerRadius(10 * density);
+            kspFullscreenButton.setBackground(background);
+            kspFullscreenButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    kspFullscreen = false;
+                    applyKspKeyboardLayout();
+                }
+            });
+        }
+
+        int size = Math.round(48 * density);
+        FrameLayout.LayoutParams buttonParams = new FrameLayout.LayoutParams(
+                size, size, Gravity.BOTTOM | Gravity.LEFT);
+        int margin = Math.round(12 * density);
+        buttonParams.setMargins(margin, 0, 0, margin);
+        contentFrame.addView(kspFullscreenButton, buttonParams);
+    }
+
     private void addKspPanel(KspKeyboardView panel, int width, int height, int gravity) {
         panel.setListener(new KspKeyboardView.Listener() {
             @Override
@@ -660,6 +714,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 if (connected) {
                     conn.sendMouseScroll((byte) direction);
                 }
+            }
+
+            @Override
+            public void onToggleFullscreen() {
+                kspFullscreen = !kspFullscreen;
+                applyKspKeyboardLayout();
             }
         });
 

@@ -31,6 +31,7 @@ public class KspKeyboardView extends View {
     private static final int KEY_MOUSE_RIGHT = -3;
     private static final int KEY_WHEEL_UP = -4;
     private static final int KEY_WHEEL_DOWN = -5;
+    private static final int KEY_TOGGLE_FULLSCREEN = -6;
 
     // Auto-repeat cadence for the held mouse wheel keys
     private static final long WHEEL_REPEAT_MS = 150;
@@ -46,6 +47,7 @@ public class KspKeyboardView extends View {
         void onToggleIme();
         void onMouseButton(boolean down, boolean rightButton);
         void onMouseScroll(int direction);
+        void onToggleFullscreen();
     }
 
     private static class Key {
@@ -167,6 +169,7 @@ public class KspKeyboardView extends View {
     public static KspKeyboardView createLandscapeBottom(Context context) {
         KspKeyboardView v = new KspKeyboardView(context);
         v.addRow(
+                new Key("⛶", "Full", KEY_TOGGLE_FULLSCREEN, 1, STYLE_ACCENT),
                 new Key("1", null, KeyEvent.KEYCODE_1, 1, STYLE_NORMAL),
                 new Key("2", null, KeyEvent.KEYCODE_2, 1, STYLE_NORMAL),
                 new Key("3", null, KeyEvent.KEYCODE_3, 1, STYLE_NORMAL),
@@ -455,6 +458,13 @@ public class KspKeyboardView extends View {
                 // Only fire on release so the IME doesn't swallow our up event
                 if (!down) {
                     listener.onToggleIme();
+                }
+                break;
+            case KEY_TOGGLE_FULLSCREEN:
+                // Fire on release; the layout rebuild destroys this view, so
+                // there must not be a pending up event for it afterwards
+                if (!down) {
+                    listener.onToggleFullscreen();
                 }
                 break;
             case KEY_MOUSE_LEFT:
