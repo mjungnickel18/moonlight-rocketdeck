@@ -71,3 +71,15 @@ by the Moonlight project.
 
 Licensed under **GPL-3.0**, same as upstream. Source for all modifications is
 in this repository.
+
+## Disclaimer
+
+This software is provided **"as is"**, without warranty of any kind, express or
+implied, including but not limited to the warranties of merchantability,
+fitness for a particular purpose and noninfringement. In no event shall the
+author be liable for any claim, damages or other liability — including but not
+limited to data loss, device damage, bricked hardware, lost saves, or exploded
+(virtual or otherwise) rockets — arising from the use of this software, its
+builds, or its installation instructions. Use at your own risk. See sections 15
+and 16 of the [GPL-3.0 license](LICENSE.txt) for the authoritative warranty and
+liability terms.
