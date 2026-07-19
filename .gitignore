@@ -42,3 +42,7 @@ app/.externalNativeBuild/
 
 # NDK stuff
 .cxx/
+# Release signing (local only, never commit)
+keystore.properties
+*.jks
+*.keystore

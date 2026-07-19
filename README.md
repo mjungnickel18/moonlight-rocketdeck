@@ -1,35 +1,73 @@
-# Moonlight Android
+# Moonlight KSP — Kerbal Space Program Streaming Client
 
-[![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/232a8tadrrn8jv0k/branch/master?svg=true)](https://ci.appveyor.com/project/cgutman/moonlight-android/branch/master)
-[![Translation Status](https://hosted.weblate.org/widgets/moonlight/-/moonlight-android/svg-badge.svg)](https://hosted.weblate.org/projects/moonlight/moonlight-android/)
+A fork of [Moonlight for Android](https://github.com/moonlight-stream/moonlight-android)
+purpose-built for playing **Kerbal Space Program** via game streaming
+([Sunshine](https://github.com/LizardByte/Sunshine) or NVIDIA GameStream) on a phone
+or tablet — with a KSP-specific on-screen keyboard laid out **around** the video
+instead of on top of it, so your fingers never cover the action.
 
-[Moonlight for Android](https://moonlight-stream.org) is an open source client for NVIDIA GameStream and [Sunshine](https://github.com/LizardByte/Sunshine).
+## Layouts
 
-Moonlight for Android will allow you to stream your full collection of games from your Windows PC to your Android device,
-whether in your own home or over the internet.
+**Portrait** (phones): video docked at the top at the stream's aspect ratio, a
+7-row keyboard filling the rest of the screen.
 
-Moonlight also has a [PC client](https://github.com/moonlight-stream/moonlight-qt) and [iOS/tvOS client](https://github.com/moonlight-stream/moonlight-ios).
+**Landscape**: video top-center, flight controls (QWE/ASD, throttle) on the left,
+toggles/staging on the right, action groups in a strip along the bottom. The
+layout adapts to the screen: on wide screens (19.5:9 phones) the video keeps
+nearly full height; on 16:10 tablets the side panels get a guaranteed minimum
+width and the bottom strip grows a second row with the RCS docking cluster.
+Rotating the device switches layouts live without restarting the stream.
 
-You can follow development on our [Discord server](https://moonlight-stream.org/discord) and help translate Moonlight into your language on [Weblate](https://hosted.weblate.org/projects/moonlight/moonlight-android/).
+## Keys
 
-## Downloads
-* [Google Play Store](https://play.google.com/store/apps/details?id=com.limelight)
-* [Amazon App Store](https://www.amazon.com/gp/product/B00JK4MFN2)
-* [F-Droid](https://f-droid.org/packages/com.limelight)
-* [APK](https://github.com/moonlight-stream/moonlight-android/releases)
+Keys behave like a physical keyboard — key-down on touch, key-up on release,
+full multi-touch — so held keys and chords (Shift+W: throttle up while pitching)
+work exactly as at a desk. All stock KSP bindings are covered:
+
+- **Flight**: Q/W/E, A/S/D, Shift/Ctrl (hold to throttle), Z/X (full/cut), Space (stage)
+- **Toggles**: T (SAS), R (RCS), G (gear), B (brakes), U (lights), F, CapsLock (precision)
+- **Systems**: action groups 1–0, Backspace (abort), M (map), V/C (camera), time warp `,` `.` `/`
+- **Docking**: H/N/J/L/I/K RCS translation
+- **Mouse**: LMB/RMB as hold-buttons (dragging works), auto-repeating scroll wheel keys
+- **⌨** toggles the Android keyboard for free text entry (vessel names, save games)
+
+The whole feature can be disabled under *Settings → Input Settings → KSP portrait
+keyboard*, which restores stock Moonlight behavior.
+
+## Installing
+
+Grab the APK from [Releases](../../releases) and sideload it. The app is a
+separate install from official Moonlight (application ID `com.limelight.kspkeyboard`),
+so both can coexist; pair it with your host as usual.
 
 ## Building
-* Install Android Studio and the Android NDK
-* Run ‘git submodule update --init --recursive’ from within moonlight-android/
-* In moonlight-android/, create a file called ‘local.properties’. Add an ‘ndk.dir=’ property to the local.properties file and set it equal to your NDK directory.
-* Build the APK using Android Studio or gradle
 
-## Authors
+Requires JDK 17+, Android SDK 34, NDK 27.0.12077973.
 
-* [Cameron Gutman](https://github.com/cgutman)  
-* [Diego Waxemberg](https://github.com/dwaxemberg)  
-* [Aaron Neyer](https://github.com/Aaronneyer)  
-* [Andrew Hennessy](https://github.com/yetanothername)
+```
+git clone --recursive <this repo>
+gradlew assembleNonRootDebug
+```
 
-Moonlight is the work of students at [Case Western](http://case.edu) and was
-started as a project at [MHacks](http://mhacks.org).
+For signed release builds, create `keystore.properties` in the repo root:
+
+```
+storeFile=/path/to/your.jks
+storePassword=...
+keyAlias=...
+keyPassword=...
+```
+
+then run `gradlew assembleNonRootRelease`.
+
+## Credits & License
+
+All streaming functionality is the work of the
+[Moonlight project](https://moonlight-stream.org); this fork only adds the
+keyboard/layout layer (see `app/src/main/java/com/limelight/ui/KspKeyboardView.java`
+and the layout code in `Game.java`). Kerbal Space Program is a trademark of its
+respective owners; this project is not affiliated with or endorsed by them, nor
+by the Moonlight project.
+
+Licensed under **GPL-3.0**, same as upstream. Source for all modifications is
+in this repository.
