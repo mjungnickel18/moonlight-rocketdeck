@@ -151,6 +151,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private TextView performanceOverlayView;
     private final java.util.List<KspKeyboardView> kspKeyboardPanels = new java.util.ArrayList<>();
     private boolean kspFullscreen;
+    private int kspLayoutMode = KspKeyboardView.MODE_FLY;
     private TextView kspFullscreenButton;
 
     private MediaCodecDecoderRenderer decoderRenderer;
@@ -575,6 +576,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         }
 
         for (KspKeyboardView panel : kspKeyboardPanels) {
+            // Send key-up for anything still held so no key sticks on the host
+            panel.releaseAllKeys();
             contentFrame.removeView(panel);
         }
         kspKeyboardPanels.clear();
@@ -628,15 +631,15 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             svParams.width = videoWidth;
             svParams.height = videoHeight;
 
-            addKspPanel(KspKeyboardView.createLandscapeLeft(this),
+            addKspPanel(KspKeyboardView.createLandscapeLeft(this, kspLayoutMode),
                     sideWidth, videoHeight, Gravity.TOP | Gravity.LEFT);
-            addKspPanel(KspKeyboardView.createLandscapeRight(this),
+            addKspPanel(KspKeyboardView.createLandscapeRight(this, kspLayoutMode),
                     sideWidth, videoHeight, Gravity.TOP | Gravity.RIGHT);
 
             // A tall strip (tablets) fits a second row with the docking keys
             boolean tallStrip = stripHeight > frameHeight * 0.2f;
-            addKspPanel(tallStrip ? KspKeyboardView.createLandscapeBottomTall(this)
-                            : KspKeyboardView.createLandscapeBottom(this),
+            addKspPanel(tallStrip ? KspKeyboardView.createLandscapeBottomTall(this, kspLayoutMode)
+                            : KspKeyboardView.createLandscapeBottom(this, kspLayoutMode),
                     FrameLayout.LayoutParams.MATCH_PARENT, stripHeight, Gravity.BOTTOM);
         }
         else {
@@ -644,7 +647,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             svParams.width = FrameLayout.LayoutParams.MATCH_PARENT;
             svParams.height = videoHeight;
 
-            addKspPanel(KspKeyboardView.createPortrait(this),
+            addKspPanel(KspKeyboardView.createPortrait(this, kspLayoutMode),
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     Math.max(frameHeight - videoHeight, 0), Gravity.BOTTOM);
         }
@@ -697,9 +700,20 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
 
             @Override
-            public void onMouseButton(boolean down, boolean rightButton) {
+            public void onMouseButton(boolean down, int which) {
                 if (connected) {
-                    byte button = rightButton ? MouseButtonPacket.BUTTON_RIGHT : MouseButtonPacket.BUTTON_LEFT;
+                    byte button;
+                    switch (which) {
+                        case KspKeyboardView.MOUSE_MIDDLE:
+                            button = MouseButtonPacket.BUTTON_MIDDLE;
+                            break;
+                        case KspKeyboardView.MOUSE_RIGHT:
+                            button = MouseButtonPacket.BUTTON_RIGHT;
+                            break;
+                        default:
+                            button = MouseButtonPacket.BUTTON_LEFT;
+                            break;
+                    }
                     if (down) {
                         conn.sendMouseButtonDown(button);
                     }
@@ -719,6 +733,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             @Override
             public void onToggleFullscreen() {
                 kspFullscreen = !kspFullscreen;
+                applyKspKeyboardLayout();
+            }
+
+            @Override
+            public void onSwitchLayout() {
+                kspLayoutMode = (kspLayoutMode + 1) % KspKeyboardView.MODE_COUNT;
                 applyKspKeyboardLayout();
             }
         });

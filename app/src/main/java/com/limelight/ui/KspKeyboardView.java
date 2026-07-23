@@ -20,49 +20,68 @@ import java.util.List;
  * like a physical keyboard: key-down on touch, key-up on release, with full
  * multi-touch support so chords like Shift+W (throttle up while pitching) work.
  *
- * In portrait, a single panel docks below the video. In landscape, three
- * panels surround it: flight controls left, toggles/staging right, and a
- * strip with action groups along the bottom.
+ * Three key layouts cover the game's phases — FLY (flight), VAB (editor) and
+ * EVA — switchable via a dedicated key. In portrait, a single panel docks
+ * below the video. In landscape, three panels surround it: movement keys
+ * left, actions right, and a strip along the bottom.
  */
 public class KspKeyboardView extends View {
-    // Pseudo keycodes for keys that don't send keyboard input
+    public static final int MODE_FLY = 0;
+    public static final int MODE_VAB = 1;
+    public static final int MODE_EVA = 2;
+    public static final int MODE_COUNT = 3;
+
+    // Pseudo keycodes for keys that don't send plain keyboard input
     private static final int KEY_TOGGLE_IME = -1;
     private static final int KEY_MOUSE_LEFT = -2;
     private static final int KEY_MOUSE_RIGHT = -3;
     private static final int KEY_WHEEL_UP = -4;
     private static final int KEY_WHEEL_DOWN = -5;
     private static final int KEY_TOGGLE_FULLSCREEN = -6;
+    private static final int KEY_SWITCH_LAYOUT = -7;
+    private static final int KEY_MOUSE_MIDDLE = -8;
 
     // Auto-repeat cadence for the held mouse wheel keys
     private static final long WHEEL_REPEAT_MS = 150;
 
-    private static final int STYLE_NORMAL = 0;
-    private static final int STYLE_ACCENT = 1;   // flight controls
-    private static final int STYLE_THROTTLE = 2;
-    private static final int STYLE_DANGER = 3;   // abort
-    private static final int STYLE_STAGE = 4;
-
     public interface Listener {
         void onKey(boolean down, int androidKeyCode);
         void onToggleIme();
-        void onMouseButton(boolean down, boolean rightButton);
+        void onMouseButton(boolean down, int button); // MotionEvent.BUTTON_-style: 0=left, 1=middle, 2=right
         void onMouseScroll(int direction);
         void onToggleFullscreen();
+        void onSwitchLayout();
     }
+
+    public static final int MOUSE_LEFT = 0;
+    public static final int MOUSE_MIDDLE = 1;
+    public static final int MOUSE_RIGHT = 2;
+
+    private static final int STYLE_NORMAL = 0;
+    private static final int STYLE_ACCENT = 1;   // movement/mouse keys
+    private static final int STYLE_THROTTLE = 2;
+    private static final int STYLE_DANGER = 3;   // abort
+    private static final int STYLE_STAGE = 4;
 
     private static class Key {
         final String label;
         final String subLabel;
         final int keyCode;
+        final int modKeyCode; // held modifier sent around keyCode (0 = none)
         final float weight;
         final int style;
         final RectF rect = new RectF();
         int pressCount; // number of pointers currently holding this key
 
         Key(String label, String subLabel, int keyCode, float weight, int style) {
+            this(label, subLabel, keyCode, 0, weight, style);
+        }
+
+        Key(String label, String subLabel, int keyCode, int modKeyCode, float weight, int style) {
             this.label = label;
             this.subLabel = subLabel;
             this.keyCode = keyCode;
+            this.modKeyCode = modKeyCode;
             this.weight = weight;
             this.style = style;
         }
@@ -98,125 +117,38 @@ public class KspKeyboardView extends View {
         subLabelPaint.setTextAlign(Paint.Align.CENTER);
     }
 
-    public static KspKeyboardView createPortrait(Context context) {
+    private static String switchLabel(int mode) {
+        switch (mode) {
+            case MODE_VAB: return "VAB ▸";
+            case MODE_EVA: return "EVA ▸";
+            default: return "FLY ▸";
+        }
+    }
+
+    private static Key switchKey(int mode, float weight) {
+        return new Key(switchLabel(mode), "Layout", KEY_SWITCH_LAYOUT, weight, STYLE_ACCENT);
+    }
+
+    // ---------------------------------------------------------------- Portrait
+
+    public static KspKeyboardView createPortrait(Context context, int mode) {
         KspKeyboardView v = new KspKeyboardView(context);
-        v.buildPortraitLayout();
+        switch (mode) {
+            case MODE_VAB: v.buildPortraitVab(); break;
+            case MODE_EVA: v.buildPortraitEva(); break;
+            default: v.buildPortraitFly(); break;
+        }
         return v;
     }
 
-    public static KspKeyboardView createLandscapeLeft(Context context) {
-        KspKeyboardView v = new KspKeyboardView(context);
-        v.addRow(
-                new Key("Q", "Roll↶", KeyEvent.KEYCODE_Q, 1, STYLE_ACCENT),
-                new Key("W", "Pitch↓", KeyEvent.KEYCODE_W, 1, STYLE_ACCENT),
-                new Key("E", "Roll↷", KeyEvent.KEYCODE_E, 1, STYLE_ACCENT)
-        );
-        v.addRow(
-                new Key("A", "Yaw←", KeyEvent.KEYCODE_A, 1, STYLE_ACCENT),
-                new Key("S", "Pitch↑", KeyEvent.KEYCODE_S, 1, STYLE_ACCENT),
-                new Key("D", "Yaw→", KeyEvent.KEYCODE_D, 1, STYLE_ACCENT)
-        );
-        v.addRow(
-                new Key("THR ▲", "Shift", KeyEvent.KEYCODE_SHIFT_LEFT, 1, STYLE_THROTTLE)
-        );
-        v.addRow(
-                new Key("THR ▼", "Ctrl", KeyEvent.KEYCODE_CTRL_LEFT, 1, STYLE_THROTTLE)
-        );
-        v.addRow(
-                new Key("Z", "Full", KeyEvent.KEYCODE_Z, 1, STYLE_THROTTLE),
-                new Key("X", "Cut", KeyEvent.KEYCODE_X, 1, STYLE_THROTTLE),
-                new Key("FINE", "Caps", KeyEvent.KEYCODE_CAPS_LOCK, 1, STYLE_NORMAL)
-        );
-        v.addRow(
-                new Key("LMB", "Click", KEY_MOUSE_LEFT, 2, STYLE_ACCENT),
-                new Key("⇡", "Wheel", KEY_WHEEL_UP, 1, STYLE_ACCENT)
-        );
-        return v;
-    }
-
-    public static KspKeyboardView createLandscapeRight(Context context) {
-        KspKeyboardView v = new KspKeyboardView(context);
-        v.addRow(
-                new Key("T", "SAS", KeyEvent.KEYCODE_T, 1, STYLE_NORMAL),
-                new Key("R", "RCS", KeyEvent.KEYCODE_R, 1, STYLE_NORMAL),
-                new Key("G", "Gear", KeyEvent.KEYCODE_G, 1, STYLE_NORMAL)
-        );
-        v.addRow(
-                new Key("B", "Brake", KeyEvent.KEYCODE_B, 1, STYLE_NORMAL),
-                new Key("U", "Light", KeyEvent.KEYCODE_U, 1, STYLE_NORMAL),
-                new Key("M", "Map", KeyEvent.KEYCODE_M, 1, STYLE_NORMAL)
-        );
-        v.addRow(
-                new Key("◀", "Warp−", KeyEvent.KEYCODE_COMMA, 1, STYLE_NORMAL),
-                new Key("▶", "Warp+", KeyEvent.KEYCODE_PERIOD, 1, STYLE_NORMAL),
-                new Key("×1", "Warp", KeyEvent.KEYCODE_SLASH, 1, STYLE_NORMAL)
-        );
-        v.addRow(
-                new Key("STAGE", "Space", KeyEvent.KEYCODE_SPACE, 1, STYLE_STAGE)
-        );
-        v.addRow(
-                new Key("ESC", "Pause", KeyEvent.KEYCODE_ESCAPE, 1, STYLE_NORMAL),
-                new Key("⌨", "Text", KEY_TOGGLE_IME, 1, STYLE_NORMAL),
-                new Key("ABORT", "Bksp", KeyEvent.KEYCODE_DEL, 1, STYLE_DANGER)
-        );
-        v.addRow(
-                new Key("⇣", "Wheel", KEY_WHEEL_DOWN, 1, STYLE_ACCENT),
-                new Key("RMB", "Click", KEY_MOUSE_RIGHT, 2, STYLE_ACCENT)
-        );
-        return v;
-    }
-
-    public static KspKeyboardView createLandscapeBottom(Context context) {
-        KspKeyboardView v = new KspKeyboardView(context);
-        v.addRow(
-                new Key("⛶", "Full", KEY_TOGGLE_FULLSCREEN, 1, STYLE_ACCENT),
-                new Key("1", null, KeyEvent.KEYCODE_1, 1, STYLE_NORMAL),
-                new Key("2", null, KeyEvent.KEYCODE_2, 1, STYLE_NORMAL),
-                new Key("3", null, KeyEvent.KEYCODE_3, 1, STYLE_NORMAL),
-                new Key("4", null, KeyEvent.KEYCODE_4, 1, STYLE_NORMAL),
-                new Key("5", null, KeyEvent.KEYCODE_5, 1, STYLE_NORMAL),
-                new Key("6", null, KeyEvent.KEYCODE_6, 1, STYLE_NORMAL),
-                new Key("7", null, KeyEvent.KEYCODE_7, 1, STYLE_NORMAL),
-                new Key("8", null, KeyEvent.KEYCODE_8, 1, STYLE_NORMAL),
-                new Key("9", null, KeyEvent.KEYCODE_9, 1, STYLE_NORMAL),
-                new Key("0", null, KeyEvent.KEYCODE_0, 1, STYLE_NORMAL),
-                new Key("F5", "QSave", KeyEvent.KEYCODE_F5, 1, STYLE_NORMAL),
-                new Key("F9", "QLoad", KeyEvent.KEYCODE_F9, 1, STYLE_NORMAL),
-                new Key("F", "Free", KeyEvent.KEYCODE_F, 1, STYLE_NORMAL),
-                new Key("V", "Cam", KeyEvent.KEYCODE_V, 1, STYLE_NORMAL),
-                new Key("C", "IVA", KeyEvent.KEYCODE_C, 1, STYLE_NORMAL),
-                new Key("[ ]", "Vessel", KeyEvent.KEYCODE_RIGHT_BRACKET, 1, STYLE_NORMAL)
-        );
-        return v;
-    }
-
-    // Two-row bottom strip for screens whose aspect ratio leaves a tall
-    // leftover below the video (e.g. 16:10 tablets): adds the RCS docking
-    // translation cluster
-    public static KspKeyboardView createLandscapeBottomTall(Context context) {
-        KspKeyboardView v = createLandscapeBottom(context);
-        v.addRow(
-                new Key("H", "Tr Fwd", KeyEvent.KEYCODE_H, 1, STYLE_NORMAL),
-                new Key("N", "Tr Back", KeyEvent.KEYCODE_N, 1, STYLE_NORMAL),
-                new Key("J", "Tr←", KeyEvent.KEYCODE_J, 1, STYLE_NORMAL),
-                new Key("L", "Tr→", KeyEvent.KEYCODE_L, 1, STYLE_NORMAL),
-                new Key("I", "Tr↓", KeyEvent.KEYCODE_I, 1, STYLE_NORMAL),
-                new Key("K", "Tr↑", KeyEvent.KEYCODE_K, 1, STYLE_NORMAL)
-        );
-        return v;
-    }
-
-    private void buildPortraitLayout() {
-        rows.clear();
-        allKeys.clear();
-
+    private void buildPortraitFly() {
         addRow(
+                switchKey(MODE_FLY, 1.2f),
                 new Key("ESC", "Pause", KeyEvent.KEYCODE_ESCAPE, 1, STYLE_NORMAL),
                 new Key("F5", "QSave", KeyEvent.KEYCODE_F5, 1, STYLE_NORMAL),
                 new Key("F9", "QLoad", KeyEvent.KEYCODE_F9, 1, STYLE_NORMAL),
                 new Key("M", "Map", KeyEvent.KEYCODE_M, 1, STYLE_NORMAL),
                 new Key("V", "Cam", KeyEvent.KEYCODE_V, 1, STYLE_NORMAL),
-                new Key("C", "IVA", KeyEvent.KEYCODE_C, 1, STYLE_NORMAL),
                 new Key("⌨", "Text", KEY_TOGGLE_IME, 1, STYLE_NORMAL),
                 new Key("ABORT", "Bksp", KeyEvent.KEYCODE_DEL, 1.5f, STYLE_DANGER)
         );
@@ -268,6 +200,86 @@ public class KspKeyboardView extends View {
                 new Key("FINE", "Caps", KeyEvent.KEYCODE_CAPS_LOCK, 1, STYLE_NORMAL),
                 new Key("[ ]", "Vessel", KeyEvent.KEYCODE_RIGHT_BRACKET, 1, STYLE_NORMAL)
         );
+        addMouseRow();
+    }
+
+    private void buildPortraitVab() {
+        addRow(
+                switchKey(MODE_VAB, 1.2f),
+                new Key("ESC", "Pause", KeyEvent.KEYCODE_ESCAPE, 1, STYLE_NORMAL),
+                new Key("UNDO", "Ctrl+Z", KeyEvent.KEYCODE_Z, KeyEvent.KEYCODE_CTRL_LEFT, 1, STYLE_NORMAL),
+                new Key("REDO", "Ctrl+Y", KeyEvent.KEYCODE_Y, KeyEvent.KEYCODE_CTRL_LEFT, 1, STYLE_NORMAL),
+                new Key("⌨", "Search", KEY_TOGGLE_IME, 1, STYLE_NORMAL),
+                new Key("DEL", "Part", KeyEvent.KEYCODE_FORWARD_DEL, 1, STYLE_DANGER)
+        );
+        addRow(
+                new Key("1", "Place", KeyEvent.KEYCODE_1, 1, STYLE_NORMAL),
+                new Key("2", "Offset", KeyEvent.KEYCODE_2, 1, STYLE_NORMAL),
+                new Key("3", "Rotate", KeyEvent.KEYCODE_3, 1, STYLE_NORMAL),
+                new Key("4", "Root", KeyEvent.KEYCODE_4, 1, STYLE_NORMAL),
+                new Key("F", "Loc/Abs", KeyEvent.KEYCODE_F, 1, STYLE_NORMAL)
+        );
+        addRow(
+                new Key("Q", "Rot↶", KeyEvent.KEYCODE_Q, 1, STYLE_ACCENT),
+                new Key("W", "Rot↑", KeyEvent.KEYCODE_W, 1, STYLE_ACCENT),
+                new Key("E", "Rot↷", KeyEvent.KEYCODE_E, 1, STYLE_ACCENT),
+                new Key("RESET", "Space", KeyEvent.KEYCODE_SPACE, 1.5f, STYLE_STAGE)
+        );
+        addRow(
+                new Key("A", "Rot←", KeyEvent.KEYCODE_A, 1, STYLE_ACCENT),
+                new Key("S", "Rot↓", KeyEvent.KEYCODE_S, 1, STYLE_ACCENT),
+                new Key("D", "Rot→", KeyEvent.KEYCODE_D, 1, STYLE_ACCENT),
+                new Key("FINE", "Shift halt.", KeyEvent.KEYCODE_SHIFT_LEFT, 1.5f, STYLE_THROTTLE)
+        );
+        addRow(
+                new Key("R", "Symmetry", KeyEvent.KEYCODE_R, 1, STYLE_NORMAL),
+                new Key("X", "Sym ±", KeyEvent.KEYCODE_X, 1, STYLE_NORMAL),
+                new Key("C", "Snap", KeyEvent.KEYCODE_C, 1, STYLE_NORMAL),
+                new Key("COPY", "Alt halt.", KeyEvent.KEYCODE_ALT_LEFT, 1, STYLE_THROTTLE),
+                new Key("PAN", "MMB halt.", KEY_MOUSE_MIDDLE, 1, STYLE_ACCENT)
+        );
+        addMouseRow();
+    }
+
+    private void buildPortraitEva() {
+        addRow(
+                switchKey(MODE_EVA, 1.2f),
+                new Key("ESC", "Pause", KeyEvent.KEYCODE_ESCAPE, 1, STYLE_NORMAL),
+                new Key("F5", "QSave", KeyEvent.KEYCODE_F5, 1, STYLE_NORMAL),
+                new Key("F9", "QLoad", KeyEvent.KEYCODE_F9, 1, STYLE_NORMAL),
+                new Key("M", "Map", KeyEvent.KEYCODE_M, 1, STYLE_NORMAL),
+                new Key("V", "Cam", KeyEvent.KEYCODE_V, 1, STYLE_NORMAL),
+                new Key("⌨", "Text", KEY_TOGGLE_IME, 1, STYLE_NORMAL)
+        );
+        addRow(
+                new Key("R", "Jetpack", KeyEvent.KEYCODE_R, 1, STYLE_NORMAL),
+                new Key("L", "Lamp", KeyEvent.KEYCODE_L, 1, STYLE_NORMAL),
+                new Key("F", "Grab/Use", KeyEvent.KEYCODE_F, 1, STYLE_NORMAL),
+                new Key("B", "Board", KeyEvent.KEYCODE_B, 1, STYLE_NORMAL),
+                new Key("[ ]", "Next", KeyEvent.KEYCODE_RIGHT_BRACKET, 1, STYLE_NORMAL)
+        );
+        addRow(
+                new Key("Q", "Roll↶", KeyEvent.KEYCODE_Q, 1, STYLE_ACCENT),
+                new Key("W", "Vor", KeyEvent.KEYCODE_W, 1, STYLE_ACCENT),
+                new Key("E", "Roll↷", KeyEvent.KEYCODE_E, 1, STYLE_ACCENT),
+                new Key("JUMP", "Space", KeyEvent.KEYCODE_SPACE, 1.5f, STYLE_STAGE)
+        );
+        addRow(
+                new Key("A", "Links", KeyEvent.KEYCODE_A, 1, STYLE_ACCENT),
+                new Key("S", "Zurück", KeyEvent.KEYCODE_S, 1, STYLE_ACCENT),
+                new Key("D", "Rechts", KeyEvent.KEYCODE_D, 1, STYLE_ACCENT),
+                new Key("RUN/JET ▲", "Shift", KeyEvent.KEYCODE_SHIFT_LEFT, 1.5f, STYLE_THROTTLE)
+        );
+        addRow(
+                new Key("JET ▼", "Ctrl", KeyEvent.KEYCODE_CTRL_LEFT, 1.5f, STYLE_THROTTLE),
+                new Key("◀", "Warp−", KeyEvent.KEYCODE_COMMA, 1, STYLE_NORMAL),
+                new Key("▶", "Warp+", KeyEvent.KEYCODE_PERIOD, 1, STYLE_NORMAL),
+                new Key("×1", "Warp", KeyEvent.KEYCODE_SLASH, 1, STYLE_NORMAL)
+        );
+        addMouseRow();
+    }
+
+    private void addMouseRow() {
         addRow(
                 new Key("LMB", "Click", KEY_MOUSE_LEFT, 2, STYLE_ACCENT),
                 new Key("⇡", "Wheel", KEY_WHEEL_UP, 1, STYLE_ACCENT),
@@ -275,6 +287,244 @@ public class KspKeyboardView extends View {
                 new Key("RMB", "Click", KEY_MOUSE_RIGHT, 2, STYLE_ACCENT)
         );
     }
+
+    // --------------------------------------------------------------- Landscape
+
+    public static KspKeyboardView createLandscapeLeft(Context context, int mode) {
+        KspKeyboardView v = new KspKeyboardView(context);
+        switch (mode) {
+            case MODE_VAB:
+                v.addRow(
+                        new Key("Q", "Rot↶", KeyEvent.KEYCODE_Q, 1, STYLE_ACCENT),
+                        new Key("W", "Rot↑", KeyEvent.KEYCODE_W, 1, STYLE_ACCENT),
+                        new Key("E", "Rot↷", KeyEvent.KEYCODE_E, 1, STYLE_ACCENT)
+                );
+                v.addRow(
+                        new Key("A", "Rot←", KeyEvent.KEYCODE_A, 1, STYLE_ACCENT),
+                        new Key("S", "Rot↓", KeyEvent.KEYCODE_S, 1, STYLE_ACCENT),
+                        new Key("D", "Rot→", KeyEvent.KEYCODE_D, 1, STYLE_ACCENT)
+                );
+                v.addRow(
+                        new Key("RESET", "Space", KeyEvent.KEYCODE_SPACE, 1, STYLE_STAGE)
+                );
+                v.addRow(
+                        new Key("FINE", "Shift halt.", KeyEvent.KEYCODE_SHIFT_LEFT, 1, STYLE_THROTTLE)
+                );
+                v.addRow(
+                        new Key("COPY", "Alt halt.", KeyEvent.KEYCODE_ALT_LEFT, 1, STYLE_THROTTLE),
+                        new Key("PAN", "MMB", KEY_MOUSE_MIDDLE, 1, STYLE_ACCENT)
+                );
+                break;
+            case MODE_EVA:
+                v.addRow(
+                        new Key("Q", "Roll↶", KeyEvent.KEYCODE_Q, 1, STYLE_ACCENT),
+                        new Key("W", "Vor", KeyEvent.KEYCODE_W, 1, STYLE_ACCENT),
+                        new Key("E", "Roll↷", KeyEvent.KEYCODE_E, 1, STYLE_ACCENT)
+                );
+                v.addRow(
+                        new Key("A", "Links", KeyEvent.KEYCODE_A, 1, STYLE_ACCENT),
+                        new Key("S", "Zurück", KeyEvent.KEYCODE_S, 1, STYLE_ACCENT),
+                        new Key("D", "Rechts", KeyEvent.KEYCODE_D, 1, STYLE_ACCENT)
+                );
+                v.addRow(
+                        new Key("RUN/JET ▲", "Shift", KeyEvent.KEYCODE_SHIFT_LEFT, 1, STYLE_THROTTLE)
+                );
+                v.addRow(
+                        new Key("JET ▼", "Ctrl", KeyEvent.KEYCODE_CTRL_LEFT, 1, STYLE_THROTTLE)
+                );
+                v.addRow(
+                        new Key("JUMP", "Space", KeyEvent.KEYCODE_SPACE, 1, STYLE_STAGE)
+                );
+                break;
+            default:
+                v.addRow(
+                        new Key("Q", "Roll↶", KeyEvent.KEYCODE_Q, 1, STYLE_ACCENT),
+                        new Key("W", "Pitch↓", KeyEvent.KEYCODE_W, 1, STYLE_ACCENT),
+                        new Key("E", "Roll↷", KeyEvent.KEYCODE_E, 1, STYLE_ACCENT)
+                );
+                v.addRow(
+                        new Key("A", "Yaw←", KeyEvent.KEYCODE_A, 1, STYLE_ACCENT),
+                        new Key("S", "Pitch↑", KeyEvent.KEYCODE_S, 1, STYLE_ACCENT),
+                        new Key("D", "Yaw→", KeyEvent.KEYCODE_D, 1, STYLE_ACCENT)
+                );
+                v.addRow(
+                        new Key("THR ▲", "Shift", KeyEvent.KEYCODE_SHIFT_LEFT, 1, STYLE_THROTTLE)
+                );
+                v.addRow(
+                        new Key("THR ▼", "Ctrl", KeyEvent.KEYCODE_CTRL_LEFT, 1, STYLE_THROTTLE)
+                );
+                v.addRow(
+                        new Key("Z", "Full", KeyEvent.KEYCODE_Z, 1, STYLE_THROTTLE),
+                        new Key("X", "Cut", KeyEvent.KEYCODE_X, 1, STYLE_THROTTLE),
+                        new Key("FINE", "Caps", KeyEvent.KEYCODE_CAPS_LOCK, 1, STYLE_NORMAL)
+                );
+                break;
+        }
+        v.addRow(
+                new Key("LMB", "Click", KEY_MOUSE_LEFT, 2, STYLE_ACCENT),
+                new Key("⇡", "Wheel", KEY_WHEEL_UP, 1, STYLE_ACCENT)
+        );
+        return v;
+    }
+
+    public static KspKeyboardView createLandscapeRight(Context context, int mode) {
+        KspKeyboardView v = new KspKeyboardView(context);
+        switch (mode) {
+            case MODE_VAB:
+                v.addRow(
+                        new Key("1", "Place", KeyEvent.KEYCODE_1, 1, STYLE_NORMAL),
+                        new Key("2", "Offset", KeyEvent.KEYCODE_2, 1, STYLE_NORMAL),
+                        new Key("3", "Rotate", KeyEvent.KEYCODE_3, 1, STYLE_NORMAL)
+                );
+                v.addRow(
+                        new Key("4", "Root", KeyEvent.KEYCODE_4, 1, STYLE_NORMAL),
+                        new Key("F", "Loc/Abs", KeyEvent.KEYCODE_F, 1, STYLE_NORMAL),
+                        new Key("R", "Symmetry", KeyEvent.KEYCODE_R, 1, STYLE_NORMAL)
+                );
+                v.addRow(
+                        new Key("X", "Sym ±", KeyEvent.KEYCODE_X, 1, STYLE_NORMAL),
+                        new Key("C", "Snap", KeyEvent.KEYCODE_C, 1, STYLE_NORMAL),
+                        new Key("DEL", "Part", KeyEvent.KEYCODE_FORWARD_DEL, 1, STYLE_DANGER)
+                );
+                v.addRow(
+                        new Key("UNDO", "Ctrl+Z", KeyEvent.KEYCODE_Z, KeyEvent.KEYCODE_CTRL_LEFT, 1, STYLE_NORMAL),
+                        new Key("REDO", "Ctrl+Y", KeyEvent.KEYCODE_Y, KeyEvent.KEYCODE_CTRL_LEFT, 1, STYLE_NORMAL)
+                );
+                v.addRow(
+                        new Key("ESC", "Pause", KeyEvent.KEYCODE_ESCAPE, 1, STYLE_NORMAL),
+                        new Key("⌨", "Search", KEY_TOGGLE_IME, 1, STYLE_NORMAL),
+                        switchKey(MODE_VAB, 1)
+                );
+                break;
+            case MODE_EVA:
+                v.addRow(
+                        new Key("R", "Jetpack", KeyEvent.KEYCODE_R, 1, STYLE_NORMAL),
+                        new Key("L", "Lamp", KeyEvent.KEYCODE_L, 1, STYLE_NORMAL),
+                        new Key("F", "Grab/Use", KeyEvent.KEYCODE_F, 1, STYLE_NORMAL)
+                );
+                v.addRow(
+                        new Key("B", "Board", KeyEvent.KEYCODE_B, 1, STYLE_NORMAL),
+                        new Key("[ ]", "Next", KeyEvent.KEYCODE_RIGHT_BRACKET, 1, STYLE_NORMAL),
+                        new Key("M", "Map", KeyEvent.KEYCODE_M, 1, STYLE_NORMAL)
+                );
+                v.addRow(
+                        new Key("◀", "Warp−", KeyEvent.KEYCODE_COMMA, 1, STYLE_NORMAL),
+                        new Key("▶", "Warp+", KeyEvent.KEYCODE_PERIOD, 1, STYLE_NORMAL),
+                        new Key("×1", "Warp", KeyEvent.KEYCODE_SLASH, 1, STYLE_NORMAL)
+                );
+                v.addRow(
+                        new Key("F5", "QSave", KeyEvent.KEYCODE_F5, 1, STYLE_NORMAL),
+                        new Key("F9", "QLoad", KeyEvent.KEYCODE_F9, 1, STYLE_NORMAL),
+                        new Key("V", "Cam", KeyEvent.KEYCODE_V, 1, STYLE_NORMAL)
+                );
+                v.addRow(
+                        new Key("ESC", "Pause", KeyEvent.KEYCODE_ESCAPE, 1, STYLE_NORMAL),
+                        new Key("⌨", "Text", KEY_TOGGLE_IME, 1, STYLE_NORMAL),
+                        switchKey(MODE_EVA, 1)
+                );
+                break;
+            default:
+                v.addRow(
+                        new Key("T", "SAS", KeyEvent.KEYCODE_T, 1, STYLE_NORMAL),
+                        new Key("R", "RCS", KeyEvent.KEYCODE_R, 1, STYLE_NORMAL),
+                        new Key("G", "Gear", KeyEvent.KEYCODE_G, 1, STYLE_NORMAL)
+                );
+                v.addRow(
+                        new Key("B", "Brake", KeyEvent.KEYCODE_B, 1, STYLE_NORMAL),
+                        new Key("U", "Light", KeyEvent.KEYCODE_U, 1, STYLE_NORMAL),
+                        new Key("M", "Map", KeyEvent.KEYCODE_M, 1, STYLE_NORMAL)
+                );
+                v.addRow(
+                        new Key("◀", "Warp−", KeyEvent.KEYCODE_COMMA, 1, STYLE_NORMAL),
+                        new Key("▶", "Warp+", KeyEvent.KEYCODE_PERIOD, 1, STYLE_NORMAL),
+                        new Key("×1", "Warp", KeyEvent.KEYCODE_SLASH, 1, STYLE_NORMAL)
+                );
+                v.addRow(
+                        new Key("STAGE", "Space", KeyEvent.KEYCODE_SPACE, 1, STYLE_STAGE)
+                );
+                v.addRow(
+                        new Key("ESC", "Pause", KeyEvent.KEYCODE_ESCAPE, 1, STYLE_NORMAL),
+                        new Key("⌨", "Text", KEY_TOGGLE_IME, 1, STYLE_NORMAL),
+                        new Key("ABORT", "Bksp", KeyEvent.KEYCODE_DEL, 1, STYLE_DANGER)
+                );
+                break;
+        }
+        v.addRow(
+                new Key("⇣", "Wheel", KEY_WHEEL_DOWN, 1, STYLE_ACCENT),
+                new Key("RMB", "Click", KEY_MOUSE_RIGHT, 2, STYLE_ACCENT)
+        );
+        return v;
+    }
+
+    public static KspKeyboardView createLandscapeBottom(Context context, int mode) {
+        KspKeyboardView v = new KspKeyboardView(context);
+        switch (mode) {
+            case MODE_VAB:
+                v.addRow(
+                        new Key("⛶", "Full", KEY_TOGGLE_FULLSCREEN, 1, STYLE_ACCENT),
+                        switchKey(MODE_VAB, 1),
+                        new Key("UNDO", "Ctrl+Z", KeyEvent.KEYCODE_Z, KeyEvent.KEYCODE_CTRL_LEFT, 1, STYLE_NORMAL),
+                        new Key("REDO", "Ctrl+Y", KeyEvent.KEYCODE_Y, KeyEvent.KEYCODE_CTRL_LEFT, 1, STYLE_NORMAL),
+                        new Key("ESC", "Pause", KeyEvent.KEYCODE_ESCAPE, 1, STYLE_NORMAL),
+                        new Key("⌨", "Search", KEY_TOGGLE_IME, 1, STYLE_NORMAL)
+                );
+                break;
+            case MODE_EVA:
+                v.addRow(
+                        new Key("⛶", "Full", KEY_TOGGLE_FULLSCREEN, 1, STYLE_ACCENT),
+                        switchKey(MODE_EVA, 1),
+                        new Key("F5", "QSave", KeyEvent.KEYCODE_F5, 1, STYLE_NORMAL),
+                        new Key("F9", "QLoad", KeyEvent.KEYCODE_F9, 1, STYLE_NORMAL),
+                        new Key("M", "Map", KeyEvent.KEYCODE_M, 1, STYLE_NORMAL),
+                        new Key("V", "Cam", KeyEvent.KEYCODE_V, 1, STYLE_NORMAL),
+                        new Key("ESC", "Pause", KeyEvent.KEYCODE_ESCAPE, 1, STYLE_NORMAL),
+                        new Key("⌨", "Text", KEY_TOGGLE_IME, 1, STYLE_NORMAL)
+                );
+                break;
+            default:
+                v.addRow(
+                        new Key("⛶", "Full", KEY_TOGGLE_FULLSCREEN, 1, STYLE_ACCENT),
+                        switchKey(MODE_FLY, 1),
+                        new Key("1", null, KeyEvent.KEYCODE_1, 1, STYLE_NORMAL),
+                        new Key("2", null, KeyEvent.KEYCODE_2, 1, STYLE_NORMAL),
+                        new Key("3", null, KeyEvent.KEYCODE_3, 1, STYLE_NORMAL),
+                        new Key("4", null, KeyEvent.KEYCODE_4, 1, STYLE_NORMAL),
+                        new Key("5", null, KeyEvent.KEYCODE_5, 1, STYLE_NORMAL),
+                        new Key("6", null, KeyEvent.KEYCODE_6, 1, STYLE_NORMAL),
+                        new Key("7", null, KeyEvent.KEYCODE_7, 1, STYLE_NORMAL),
+                        new Key("8", null, KeyEvent.KEYCODE_8, 1, STYLE_NORMAL),
+                        new Key("9", null, KeyEvent.KEYCODE_9, 1, STYLE_NORMAL),
+                        new Key("0", null, KeyEvent.KEYCODE_0, 1, STYLE_NORMAL),
+                        new Key("F5", "QSave", KeyEvent.KEYCODE_F5, 1, STYLE_NORMAL),
+                        new Key("F9", "QLoad", KeyEvent.KEYCODE_F9, 1, STYLE_NORMAL),
+                        new Key("F", "Free", KeyEvent.KEYCODE_F, 1, STYLE_NORMAL),
+                        new Key("V", "Cam", KeyEvent.KEYCODE_V, 1, STYLE_NORMAL),
+                        new Key("C", "IVA", KeyEvent.KEYCODE_C, 1, STYLE_NORMAL),
+                        new Key("[ ]", "Vessel", KeyEvent.KEYCODE_RIGHT_BRACKET, 1, STYLE_NORMAL)
+                );
+                break;
+        }
+        return v;
+    }
+
+    // Two-row bottom strip for screens whose aspect ratio leaves a tall
+    // leftover below the video (e.g. 16:10 tablets)
+    public static KspKeyboardView createLandscapeBottomTall(Context context, int mode) {
+        KspKeyboardView v = createLandscapeBottom(context, mode);
+        if (mode == MODE_FLY) {
+            v.addRow(
+                    new Key("H", "Tr Fwd", KeyEvent.KEYCODE_H, 1, STYLE_NORMAL),
+                    new Key("N", "Tr Back", KeyEvent.KEYCODE_N, 1, STYLE_NORMAL),
+                    new Key("J", "Tr←", KeyEvent.KEYCODE_J, 1, STYLE_NORMAL),
+                    new Key("L", "Tr→", KeyEvent.KEYCODE_L, 1, STYLE_NORMAL),
+                    new Key("I", "Tr↓", KeyEvent.KEYCODE_I, 1, STYLE_NORMAL),
+                    new Key("K", "Tr↑", KeyEvent.KEYCODE_K, 1, STYLE_NORMAL)
+            );
+        }
+        return v;
+    }
+
+    // ------------------------------------------------------------------ Layout
 
     private void addRow(Key... keys) {
         List<Key> row = new ArrayList<>();
@@ -296,7 +546,7 @@ public class KspKeyboardView extends View {
     }
 
     private void layoutKeys(int w, int h) {
-        if (w == 0 || h == 0) {
+        if (w == 0 || h == 0 || rows.isEmpty()) {
             return;
         }
 
@@ -323,6 +573,8 @@ public class KspKeyboardView extends View {
         labelPaint.setTextSize(rowHeight * 0.32f);
         subLabelPaint.setTextSize(rowHeight * 0.18f);
     }
+
+    // ----------------------------------------------------------------- Drawing
 
     @Override
     protected void onDraw(Canvas canvas) {
@@ -378,6 +630,8 @@ public class KspKeyboardView extends View {
         }
     }
 
+    // ------------------------------------------------------------------- Touch
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         switch (event.getActionMasked()) {
@@ -396,7 +650,7 @@ public class KspKeyboardView extends View {
                 performClick();
                 return true;
             case MotionEvent.ACTION_CANCEL:
-                releaseAllPointers();
+                releaseAllKeys();
                 return true;
             default:
                 return true;
@@ -438,7 +692,12 @@ public class KspKeyboardView extends View {
         }
     }
 
-    private void releaseAllPointers() {
+    /**
+     * Releases every held key, sending the corresponding up events. Called on
+     * touch cancellation and by the host before this panel is removed, so no
+     * key is left stuck down on the streaming host.
+     */
+    public void releaseAllKeys() {
         pointerKeyMap.clear();
         for (Key k : allKeys) {
             if (k.pressCount > 0) {
@@ -448,6 +707,14 @@ public class KspKeyboardView extends View {
         }
         invalidate();
     }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        releaseAllKeys();
+        super.onDetachedFromWindow();
+    }
+
+    // ---------------------------------------------------------------- Dispatch
 
     private void dispatchKey(final Key k, boolean down) {
         if (listener == null) {
@@ -467,9 +734,19 @@ public class KspKeyboardView extends View {
                     listener.onToggleFullscreen();
                 }
                 break;
+            case KEY_SWITCH_LAYOUT:
+                if (!down) {
+                    listener.onSwitchLayout();
+                }
+                break;
             case KEY_MOUSE_LEFT:
+                listener.onMouseButton(down, MOUSE_LEFT);
+                break;
+            case KEY_MOUSE_MIDDLE:
+                listener.onMouseButton(down, MOUSE_MIDDLE);
+                break;
             case KEY_MOUSE_RIGHT:
-                listener.onMouseButton(down, k.keyCode == KEY_MOUSE_RIGHT);
+                listener.onMouseButton(down, MOUSE_RIGHT);
                 break;
             case KEY_WHEEL_UP:
             case KEY_WHEEL_DOWN:
@@ -489,7 +766,21 @@ public class KspKeyboardView extends View {
                 }
                 break;
             default:
-                listener.onKey(down, k.keyCode);
+                if (k.modKeyCode != 0) {
+                    // Modifier combo key (e.g. Ctrl+Z): wrap the base key in
+                    // the modifier's down/up
+                    if (down) {
+                        listener.onKey(true, k.modKeyCode);
+                        listener.onKey(true, k.keyCode);
+                    }
+                    else {
+                        listener.onKey(false, k.keyCode);
+                        listener.onKey(false, k.modKeyCode);
+                    }
+                }
+                else {
+                    listener.onKey(down, k.keyCode);
+                }
                 break;
         }
     }
