@@ -44,6 +44,11 @@ public class KspKeyboardView extends View {
     // Auto-repeat cadence for the held mouse wheel keys
     private static final long WHEEL_REPEAT_MS = 150;
 
+    // Invisible, untouchable filler used to group keys within a row
+    private static Key spacer(float weight) {
+        return new Key("", null, KeyEvent.KEYCODE_UNKNOWN, weight, STYLE_NORMAL);
+    }
+
     public interface Listener {
         void onKey(boolean down, int androidKeyCode);
         void onToggleIme();
@@ -518,13 +523,16 @@ public class KspKeyboardView extends View {
     public static KspKeyboardView createLandscapeBottomTall(Context context, int mode) {
         KspKeyboardView v = createLandscapeBottom(context, mode);
         if (mode == MODE_FLY) {
+            // Docking translation, grouped for two-handed grip: fwd/back under
+            // the left thumb, the directional cluster under the right thumb
             v.addRow(
-                    new Key("H", "Tr Fwd", KeyEvent.KEYCODE_H, 1, STYLE_NORMAL),
-                    new Key("N", "Tr Back", KeyEvent.KEYCODE_N, 1, STYLE_NORMAL),
-                    new Key("J", "Tr←", KeyEvent.KEYCODE_J, 1, STYLE_NORMAL),
-                    new Key("L", "Tr→", KeyEvent.KEYCODE_L, 1, STYLE_NORMAL),
-                    new Key("I", "Tr↓", KeyEvent.KEYCODE_I, 1, STYLE_NORMAL),
-                    new Key("K", "Tr↑", KeyEvent.KEYCODE_K, 1, STYLE_NORMAL)
+                    new Key("H", "Tr Fwd", KeyEvent.KEYCODE_H, 1.2f, STYLE_ACCENT),
+                    new Key("N", "Tr Back", KeyEvent.KEYCODE_N, 1.2f, STYLE_ACCENT),
+                    spacer(2.2f),
+                    new Key("J", "Tr ←", KeyEvent.KEYCODE_J, 1, STYLE_ACCENT),
+                    new Key("I", "Tr ↓", KeyEvent.KEYCODE_I, 1, STYLE_ACCENT),
+                    new Key("K", "Tr ↑", KeyEvent.KEYCODE_K, 1, STYLE_ACCENT),
+                    new Key("L", "Tr →", KeyEvent.KEYCODE_L, 1, STYLE_ACCENT)
             );
         }
         return v;
@@ -597,6 +605,9 @@ public class KspKeyboardView extends View {
 
         float radius = Math.max(4f, getWidth() * 0.008f);
         for (Key k : allKeys) {
+            if (k.keyCode == KeyEvent.KEYCODE_UNKNOWN) {
+                continue; // spacer
+            }
             keyPaint.setColor(getKeyColor(k));
             canvas.drawRoundRect(k.rect, radius, radius, keyPaint);
 
@@ -680,6 +691,9 @@ public class KspKeyboardView extends View {
     private void handlePointerDown(int pointerId, float x, float y) {
         for (int i = 0; i < allKeys.size(); i++) {
             Key k = allKeys.get(i);
+            if (k.keyCode == KeyEvent.KEYCODE_UNKNOWN) {
+                continue; // spacer
+            }
             if (k.rect.contains(x, y)) {
                 pointerKeyMap.put(pointerId, i);
                 k.pressCount++;
