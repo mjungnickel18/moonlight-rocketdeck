@@ -170,10 +170,19 @@ public class PreferenceConfiguration {
         else if (width == 1280 && height == 720) {
             return false;
         }
+        else if (width == 1280 && height == 800) {
+            return false;
+        }
         else if (width == 1920 && height == 1080) {
             return false;
         }
+        else if (width == 1920 && height == 1200) {
+            return false;
+        }
         else if (width == 2560 && height == 1440) {
+            return false;
+        }
+        else if (width == 2560 && height == 1600) {
             return false;
         }
         else if (width == 3840 && height == 2160) {
