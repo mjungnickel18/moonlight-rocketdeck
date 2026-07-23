@@ -322,15 +322,17 @@ public class KspKeyboardView extends View {
                 );
                 break;
             case MODE_EVA:
+                // Movement lives on the RIGHT panel in EVA so the right thumb
+                // flies the kerbal; the left thumb works the jetpack throttle
                 v.addRow(
-                        new Key("Q", "Roll↶", KeyEvent.KEYCODE_Q, 1, STYLE_ACCENT),
-                        new Key("W", "Vor", KeyEvent.KEYCODE_W, 1, STYLE_ACCENT),
-                        new Key("E", "Roll↷", KeyEvent.KEYCODE_E, 1, STYLE_ACCENT)
+                        new Key("R", "Jetpack", KeyEvent.KEYCODE_R, 1, STYLE_NORMAL),
+                        new Key("L", "Lamp", KeyEvent.KEYCODE_L, 1, STYLE_NORMAL),
+                        new Key("F", "Grab/Use", KeyEvent.KEYCODE_F, 1, STYLE_NORMAL)
                 );
                 v.addRow(
-                        new Key("A", "Links", KeyEvent.KEYCODE_A, 1, STYLE_ACCENT),
-                        new Key("S", "Zurück", KeyEvent.KEYCODE_S, 1, STYLE_ACCENT),
-                        new Key("D", "Rechts", KeyEvent.KEYCODE_D, 1, STYLE_ACCENT)
+                        new Key("B", "Board", KeyEvent.KEYCODE_B, 1, STYLE_NORMAL),
+                        new Key("[ ]", "Next", KeyEvent.KEYCODE_RIGHT_BRACKET, 1, STYLE_NORMAL),
+                        new Key("M", "Map", KeyEvent.KEYCODE_M, 1, STYLE_NORMAL)
                 );
                 v.addRow(
                         new Key("RUN/JET ▲", "Shift", KeyEvent.KEYCODE_SHIFT_LEFT, 1, STYLE_THROTTLE)
@@ -403,14 +405,14 @@ public class KspKeyboardView extends View {
                 break;
             case MODE_EVA:
                 v.addRow(
-                        new Key("R", "Jetpack", KeyEvent.KEYCODE_R, 1, STYLE_NORMAL),
-                        new Key("L", "Lamp", KeyEvent.KEYCODE_L, 1, STYLE_NORMAL),
-                        new Key("F", "Grab/Use", KeyEvent.KEYCODE_F, 1, STYLE_NORMAL)
+                        new Key("Q", "Roll↶", KeyEvent.KEYCODE_Q, 1, STYLE_ACCENT),
+                        new Key("W", "Vor", KeyEvent.KEYCODE_W, 1, STYLE_ACCENT),
+                        new Key("E", "Roll↷", KeyEvent.KEYCODE_E, 1, STYLE_ACCENT)
                 );
                 v.addRow(
-                        new Key("B", "Board", KeyEvent.KEYCODE_B, 1, STYLE_NORMAL),
-                        new Key("[ ]", "Next", KeyEvent.KEYCODE_RIGHT_BRACKET, 1, STYLE_NORMAL),
-                        new Key("M", "Map", KeyEvent.KEYCODE_M, 1, STYLE_NORMAL)
+                        new Key("A", "Links", KeyEvent.KEYCODE_A, 1, STYLE_ACCENT),
+                        new Key("S", "Zurück", KeyEvent.KEYCODE_S, 1, STYLE_ACCENT),
+                        new Key("D", "Rechts", KeyEvent.KEYCODE_D, 1, STYLE_ACCENT)
                 );
                 v.addRow(
                         new Key("◀", "Warp−", KeyEvent.KEYCODE_COMMA, 1, STYLE_NORMAL),
