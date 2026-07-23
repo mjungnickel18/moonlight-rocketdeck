@@ -71,7 +71,13 @@ public class KspKeyboardView extends View {
         final float weight;
         final int style;
         final RectF rect = new RectF();
+        float fixedWidthDp; // when > 0, the key gets exactly this width instead of a weight share
         int pressCount; // number of pointers currently holding this key
+
+        Key fixedWidth(float dp) {
+            this.fixedWidthDp = dp;
+            return this;
+        }
 
         Key(String label, String subLabel, int keyCode, float weight, int style) {
             this(label, subLabel, keyCode, 0, weight, style);
@@ -392,8 +398,7 @@ public class KspKeyboardView extends View {
                 );
                 v.addRow(
                         new Key("ESC", "Pause", KeyEvent.KEYCODE_ESCAPE, 1, STYLE_NORMAL),
-                        new Key("⌨", "Search", KEY_TOGGLE_IME, 1, STYLE_NORMAL),
-                        switchKey(MODE_VAB, 1)
+                        new Key("⌨", "Search", KEY_TOGGLE_IME, 1, STYLE_NORMAL)
                 );
                 break;
             case MODE_EVA:
@@ -419,8 +424,7 @@ public class KspKeyboardView extends View {
                 );
                 v.addRow(
                         new Key("ESC", "Pause", KeyEvent.KEYCODE_ESCAPE, 1, STYLE_NORMAL),
-                        new Key("⌨", "Text", KEY_TOGGLE_IME, 1, STYLE_NORMAL),
-                        switchKey(MODE_EVA, 1)
+                        new Key("⌨", "Text", KEY_TOGGLE_IME, 1, STYLE_NORMAL)
                 );
                 break;
             default:
@@ -461,8 +465,8 @@ public class KspKeyboardView extends View {
         switch (mode) {
             case MODE_VAB:
                 v.addRow(
-                        new Key("⛶", "Full", KEY_TOGGLE_FULLSCREEN, 1, STYLE_ACCENT),
-                        switchKey(MODE_VAB, 1),
+                        new Key("⛶", "Full", KEY_TOGGLE_FULLSCREEN, 1, STYLE_ACCENT).fixedWidth(64),
+                        switchKey(MODE_VAB, 1).fixedWidth(64),
                         new Key("UNDO", "Ctrl+Z", KeyEvent.KEYCODE_Z, KeyEvent.KEYCODE_CTRL_LEFT, 1, STYLE_NORMAL),
                         new Key("REDO", "Ctrl+Y", KeyEvent.KEYCODE_Y, KeyEvent.KEYCODE_CTRL_LEFT, 1, STYLE_NORMAL),
                         new Key("ESC", "Pause", KeyEvent.KEYCODE_ESCAPE, 1, STYLE_NORMAL),
@@ -471,8 +475,8 @@ public class KspKeyboardView extends View {
                 break;
             case MODE_EVA:
                 v.addRow(
-                        new Key("⛶", "Full", KEY_TOGGLE_FULLSCREEN, 1, STYLE_ACCENT),
-                        switchKey(MODE_EVA, 1),
+                        new Key("⛶", "Full", KEY_TOGGLE_FULLSCREEN, 1, STYLE_ACCENT).fixedWidth(64),
+                        switchKey(MODE_EVA, 1).fixedWidth(64),
                         new Key("F5", "QSave", KeyEvent.KEYCODE_F5, 1, STYLE_NORMAL),
                         new Key("F9", "QLoad", KeyEvent.KEYCODE_F9, 1, STYLE_NORMAL),
                         new Key("M", "Map", KeyEvent.KEYCODE_M, 1, STYLE_NORMAL),
@@ -483,8 +487,8 @@ public class KspKeyboardView extends View {
                 break;
             default:
                 v.addRow(
-                        new Key("⛶", "Full", KEY_TOGGLE_FULLSCREEN, 1, STYLE_ACCENT),
-                        switchKey(MODE_FLY, 1),
+                        new Key("⛶", "Full", KEY_TOGGLE_FULLSCREEN, 1, STYLE_ACCENT).fixedWidth(64),
+                        switchKey(MODE_FLY, 1).fixedWidth(64),
                         new Key("1", null, KeyEvent.KEYCODE_1, 1, STYLE_NORMAL),
                         new Key("2", null, KeyEvent.KEYCODE_2, 1, STYLE_NORMAL),
                         new Key("3", null, KeyEvent.KEYCODE_3, 1, STYLE_NORMAL),
@@ -552,21 +556,30 @@ public class KspKeyboardView extends View {
 
         float gap = Math.max(2f, w * 0.006f);
         float rowHeight = (h - gap) / rows.size();
+        float density = getResources().getDisplayMetrics().density;
 
         for (int r = 0; r < rows.size(); r++) {
             List<Key> row = rows.get(r);
+            // Fixed-width keys claim their exact size; the rest of the row is
+            // shared among the weighted keys
             float totalWeight = 0;
+            float fixedTotal = 0;
             for (Key k : row) {
-                totalWeight += k.weight;
+                if (k.fixedWidthDp > 0) {
+                    fixedTotal += k.fixedWidthDp * density;
+                }
+                else {
+                    totalWeight += k.weight;
+                }
             }
-            float unitWidth = (w - gap) / totalWeight;
+            float unitWidth = totalWeight > 0 ? (w - gap - fixedTotal) / totalWeight : 0;
 
             float x = gap;
             float top = gap + r * rowHeight;
             for (Key k : row) {
-                float keyWidth = unitWidth * k.weight - gap;
-                k.rect.set(x, top, x + keyWidth, top + rowHeight - gap);
-                x += unitWidth * k.weight;
+                float slot = (k.fixedWidthDp > 0) ? k.fixedWidthDp * density : unitWidth * k.weight;
+                k.rect.set(x, top, x + slot - gap, top + rowHeight - gap);
+                x += slot;
             }
         }
 
