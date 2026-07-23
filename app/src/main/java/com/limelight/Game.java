@@ -605,6 +605,23 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             streamView.setLayoutParams(svParams);
 
             addKspFullscreenButton(contentFrame);
+
+            // Floating mouse buttons: LMB next to the fullscreen button on
+            // the left, RMB in the right corner
+            float density = getResources().getDisplayMetrics().density;
+            int mouseWidth = Math.round(88 * density);
+            int mouseHeight = Math.round(48 * density);
+            int margin = Math.round(12 * density);
+
+            FrameLayout.LayoutParams lmbParams = new FrameLayout.LayoutParams(
+                    mouseWidth, mouseHeight, Gravity.BOTTOM | Gravity.LEFT);
+            lmbParams.setMargins(Math.round(72 * density), 0, 0, margin);
+            addKspPanel(KspKeyboardView.createFullscreenMouse(this, false), lmbParams);
+
+            FrameLayout.LayoutParams rmbParams = new FrameLayout.LayoutParams(
+                    mouseWidth, mouseHeight, Gravity.BOTTOM | Gravity.RIGHT);
+            rmbParams.setMargins(0, 0, margin, margin);
+            addKspPanel(KspKeyboardView.createFullscreenMouse(this, true), rmbParams);
             return;
         }
 
@@ -686,6 +703,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     }
 
     private void addKspPanel(KspKeyboardView panel, int width, int height, int gravity) {
+        addKspPanel(panel, new FrameLayout.LayoutParams(width, height, gravity));
+    }
+
+    private void addKspPanel(KspKeyboardView panel, FrameLayout.LayoutParams params) {
         panel.setListener(new KspKeyboardView.Listener() {
             @Override
             public void onKey(boolean down, int androidKeyCode) {
@@ -744,7 +765,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         });
 
         FrameLayout contentFrame = (FrameLayout) streamView.getParent();
-        contentFrame.addView(panel, new FrameLayout.LayoutParams(width, height, gravity));
+        contentFrame.addView(panel, params);
         kspKeyboardPanels.add(panel);
     }
 

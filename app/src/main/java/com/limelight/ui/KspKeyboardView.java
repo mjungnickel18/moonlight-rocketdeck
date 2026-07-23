@@ -290,6 +290,20 @@ public class KspKeyboardView extends View {
         addMouseRow();
     }
 
+    // Single floating mouse button used in fullscreen mode
+    public static KspKeyboardView createFullscreenMouse(Context context, boolean right) {
+        KspKeyboardView v = new KspKeyboardView(context);
+        if (right) {
+            v.addRow(new Key("RMB", "Click", KEY_MOUSE_RIGHT, 1, STYLE_ACCENT));
+        }
+        else {
+            v.addRow(new Key("LMB", "Click", KEY_MOUSE_LEFT, 1, STYLE_ACCENT));
+        }
+        v.setBackgroundColor(Color.TRANSPARENT);
+        v.setAlpha(0.75f);
+        return v;
+    }
+
     private void addMouseRow() {
         addRow(
                 new Key("LMB", "Click", KEY_MOUSE_LEFT, 2, STYLE_ACCENT),
