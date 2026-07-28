@@ -260,6 +260,7 @@ public class KspKeyboardView extends View {
                 new Key("F9", "QLoad", KeyEvent.KEYCODE_F9, 1, STYLE_NORMAL),
                 new Key("M", "Map", KeyEvent.KEYCODE_M, 1, STYLE_NORMAL),
                 new Key("V", "Cam", KeyEvent.KEYCODE_V, 1, STYLE_NORMAL),
+                new Key("C", "IVA", KeyEvent.KEYCODE_C, 1, STYLE_NORMAL),
                 new Key("⌨", "Text", KEY_TOGGLE_IME, 1, STYLE_NORMAL)
         );
         addRow(
@@ -267,6 +268,7 @@ public class KspKeyboardView extends View {
                 new Key("L", "Lamp", KeyEvent.KEYCODE_L, 1, STYLE_NORMAL),
                 new Key("F", "Grab/Use", KeyEvent.KEYCODE_F, 1, STYLE_NORMAL),
                 new Key("B", "Board", KeyEvent.KEYCODE_B, 1, STYLE_NORMAL),
+                new Key("O", "Unbuckle", KeyEvent.KEYCODE_O, 1, STYLE_NORMAL),
                 new Key("[ ]", "Next", KeyEvent.KEYCODE_RIGHT_BRACKET, 1, STYLE_NORMAL)
         );
         addRow(
@@ -439,9 +441,8 @@ public class KspKeyboardView extends View {
                         new Key("×1", "Warp", KeyEvent.KEYCODE_SLASH, 1, STYLE_NORMAL)
                 );
                 v.addRow(
-                        new Key("F5", "QSave", KeyEvent.KEYCODE_F5, 1, STYLE_NORMAL),
-                        new Key("F9", "QLoad", KeyEvent.KEYCODE_F9, 1, STYLE_NORMAL),
-                        new Key("V", "Cam", KeyEvent.KEYCODE_V, 1, STYLE_NORMAL)
+                        new Key("C", "IVA", KeyEvent.KEYCODE_C, 1, STYLE_NORMAL),
+                        new Key("O", "Unbuckle", KeyEvent.KEYCODE_O, 1, STYLE_NORMAL)
                 );
                 v.addRow(
                         new Key("ESC", "Pause", KeyEvent.KEYCODE_ESCAPE, 1, STYLE_NORMAL),
